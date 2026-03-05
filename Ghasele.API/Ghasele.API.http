@@ -1,0 +1,6 @@
+@Ghasele.API_HostAddress = http://localhost:5001
+
+GET {{Ghasele.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
