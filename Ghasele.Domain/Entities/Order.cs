@@ -13,7 +13,7 @@ namespace Ghasele.Domain.Entities
         public decimal DeliveryAmount { get; set; }
         public decimal CleanerAmount { get; set; }
         public string ReferenceNumber { get; set; } = string.Empty;
-        public OrderStatus Status { get; set; } = OrderStatus.Pending;
+        public OrderStatus Status { get; set; } = OrderStatus.PendingCollection;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation Property

@@ -106,7 +106,7 @@ namespace Ghasele.Infrastructure.Repositories
         public async Task<bool> HasPendingOrderAsync(Guid userId)
         {
             return await _context.Orders
-                .AnyAsync(o => o.UserId == userId && o.Status == OrderStatus.Pending);
+                .AnyAsync(o => o.UserId == userId && o.Status == OrderStatus.PendingCollection);
         }
 
         public async Task DeleteAsync(Guid id)

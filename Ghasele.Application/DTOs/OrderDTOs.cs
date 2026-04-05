@@ -31,6 +31,7 @@ namespace Ghasele.Application.DTOs
         public string UserFullName { get; set; } = string.Empty;
         public string UserEmail { get; set; } = string.Empty;
         public string UserPhoneNumber { get; set; } = string.Empty;
+        public string? UserLocationName { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal NetAmount { get; set; }
         public decimal DeliveryAmount { get; set; }

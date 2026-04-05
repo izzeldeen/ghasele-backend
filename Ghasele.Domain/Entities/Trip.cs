@@ -7,7 +7,7 @@ namespace Ghasele.Domain.Entities
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public string ReferenceNumber { get; set; } = string.Empty;
-        public TripStatus Status { get; set; } = TripStatus.Created;
+        public TripStatus Status { get; set; } = TripStatus.Assigned;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public Guid? AssignedDriverId { get; set; }
         public Driver? Driver { get; set; }

@@ -26,10 +26,20 @@ namespace Ghasele.Application.Services
 
         public async Task<TripDto> CreateTripAsync(CreateTripDto dto)
         {
+            if (dto.CleanerId == null || dto.DriverId == null)
+            {
+                throw new ArgumentException("Cleaner and Driver must be selected for trip creation.");
+            }
+
+            if (dto.OrderIds == null || !dto.OrderIds.Any())
+            {
+                throw new ArgumentException("At least one order must be selected for trip creation.");
+            }
+
             var trip = new Trip
             {
                 ReferenceNumber = $"TRP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N").Substring(0, 4).ToUpper()}",
-                Status = TripStatus.Created,
+                Status = TripStatus.Assigned,
                 CreatedAt = DateTime.UtcNow,
                 RouteJson = dto.RouteJson,
                 StartLocationLat = dto.StartLocationLat,
@@ -43,28 +53,139 @@ namespace Ghasele.Application.Services
                 var order = await _orderRepository.GetByIdAsync(orderId);
                 if (order != null)
                 {
-                    order.Status = OrderStatus.InProgress;
+                    if (order.TripId != null)
+                    {
+                        throw new InvalidOperationException($"Order {order.ReferenceNumber} is already assigned to another trip.");
+                    }
+                    order.Status = OrderStatus.Assigned;
                     trip.Orders.Add(order);
                 }
             }
 
             await _tripRepository.AddAsync(trip);
 
-            // Send notifications and save to DB
+            // Notifications
             foreach (var order in trip.Orders)
             {
                 if (order.User != null)
                 {
                     string title = "تحديث طلب";
                     string body = "السائق في الطريق لاستلام طلبك!";
-                    
                     await _userNotificationService.CreateNotificationAsync(order.UserId, title, body);
-
                     if (!string.IsNullOrEmpty(order.User.FcmToken))
                     {
                         await _notificationService.SendNotificationAsync(order.User.FcmToken, title, body);
                     }
                 }
+            }
+
+            return MapToDto(trip);
+        }
+
+        public async Task<TripDto> CollectOrderAsync(Guid orderId)
+        {
+            var order = await _orderRepository.GetByIdAsync(orderId);
+            if (order == null) throw new Exception("Order not found");
+            if (order.TripId == null) throw new Exception("Order is not part of a trip");
+
+            var trip = await _tripRepository.GetByIdAsync(order.TripId.Value);
+            if (trip == null) throw new Exception("Trip not found");
+
+            // Check if this is the "next" order to be collected (sequential logic)
+            // For now, we allow any order in PendingCollection, but the UI should enforce sequence.
+            // If we strictly want to enforce here:
+            // var previousIncomplete = trip.Orders.Where(o => o.Status == OrderStatus.PendingCollection && o.CreatedAt < order.CreatedAt).Any();
+            // if (previousIncomplete) throw new Exception("Orders must be collected one by one in sequence.");
+
+            order.Status = OrderStatus.Collected;
+            await _orderRepository.UpdateAsync(order);
+
+            // Auto-transition trip status if all orders are Collected
+            if (trip.Orders.All(o => o.Status == OrderStatus.Collected))
+            {
+                trip.Status = TripStatus.Collected;
+                await _tripRepository.UpdateAsync(trip);
+            }
+
+            return MapToDto(trip);
+        }
+
+        public async Task<TripDto> DeliverToCleanerAsync(Guid tripId)
+        {
+            var trip = await _tripRepository.GetByIdAsync(tripId);
+            if (trip == null) throw new Exception("Trip not found");
+
+            if (trip.Status != TripStatus.Collected)
+            {
+                throw new InvalidOperationException("Trip must be in Collected status before delivering to cleaner.");
+            }
+
+            trip.Status = TripStatus.Cleaning;
+            foreach (var order in trip.Orders)
+            {
+                order.Status = OrderStatus.Cleaning;
+            }
+
+            await _tripRepository.UpdateAsync(trip);
+            return MapToDto(trip);
+        }
+
+        public async Task<TripDto> UpdateOrderInTripStatusAsync(Guid orderId, Ghasele.Domain.Entities.OrderStatus status)
+        {
+            var order = await _orderRepository.GetByIdAsync(orderId);
+            if (order == null) throw new Exception("Order not found");
+            if (order.TripId == null) throw new Exception("Order is not part of a trip");
+
+            order.Status = status;
+            await _orderRepository.UpdateAsync(order);
+
+            var trip = await _tripRepository.GetByIdAsync(order.TripId.Value);
+            if (trip == null) throw new Exception("Trip not found");
+
+            // Side Effects
+            if (status == OrderStatus.OutForDelivery)
+            {
+                if (order.User != null)
+                {
+                    string title = "تحديث طلب";
+                    string body = "طلبك الآن في طريقه إليك!";
+                    await _userNotificationService.CreateNotificationAsync(order.UserId, title, body);
+                    if (!string.IsNullOrEmpty(order.User.FcmToken))
+                    {
+                        await _notificationService.SendNotificationAsync(order.User.FcmToken, title, body);
+                    }
+                }
+            }
+            else if (status == OrderStatus.Delivered)
+            {
+                // Auto-transition trip status if all orders are Delivered
+                if (trip.Orders.All(o => o.Status == OrderStatus.Delivered))
+                {
+                    trip.Status = TripStatus.Delivered;
+                    await _tripRepository.UpdateAsync(trip);
+                }
+            }
+
+            return MapToDto(trip);
+        }
+
+        public async Task<TripDto> DeliverOrderAsync(Guid orderId)
+        {
+            var order = await _orderRepository.GetByIdAsync(orderId);
+            if (order == null) throw new Exception("Order not found");
+            if (order.TripId == null) throw new Exception("Order is not part of a trip");
+
+            var trip = await _tripRepository.GetByIdAsync(order.TripId.Value);
+            if (trip == null) throw new Exception("Trip not found");
+
+            order.Status = OrderStatus.Delivered;
+            await _orderRepository.UpdateAsync(order);
+
+            // Auto-transition trip status if all orders are Delivered
+            if (trip.Orders.All(o => o.Status == OrderStatus.Delivered))
+            {
+                trip.Status = TripStatus.Delivered;
+                await _tripRepository.UpdateAsync(trip);
             }
 
             return MapToDto(trip);
@@ -80,7 +201,11 @@ namespace Ghasele.Application.Services
                 var order = await _orderRepository.GetByIdAsync(orderId);
                 if (order != null)
                 {
-                    order.Status = OrderStatus.InProgress;
+                    if (order.TripId != null && order.TripId != dto.TripId)
+                    {
+                         throw new InvalidOperationException($"Order {order.ReferenceNumber} is already assigned to another trip.");
+                    }
+                    order.Status = OrderStatus.Assigned;
                     if (!trip.Orders.Any(o => o.Id == orderId))
                     {
                         trip.Orders.Add(order);
@@ -88,26 +213,11 @@ namespace Ghasele.Application.Services
                 }
             }
 
+            if (!string.IsNullOrEmpty(dto.RouteJson)) trip.RouteJson = dto.RouteJson;
+            if (dto.StartLocationLat.HasValue) trip.StartLocationLat = dto.StartLocationLat.Value;
+            if (dto.StartLocationLng.HasValue) trip.StartLocationLng = dto.StartLocationLng.Value;
+
             await _tripRepository.UpdateAsync(trip);
-
-            // Send notifications
-            foreach (var orderId in dto.OrderIds)
-            {
-                var order = trip.Orders.FirstOrDefault(o => o.Id == orderId);
-                if (order?.User != null)
-                {
-                    string title = "تحديث رحلة";
-                    string body = "تم إضافة طلبك إلى رحلة جديدة!";
-                    
-                    await _userNotificationService.CreateNotificationAsync(order.UserId, title, body);
-
-                    if (!string.IsNullOrEmpty(order.User.FcmToken))
-                    {
-                        await _notificationService.SendNotificationAsync(order.User.FcmToken, title, body);
-                    }
-                }
-            }
-
             return MapToDto(trip);
         }
 
@@ -119,53 +229,8 @@ namespace Ghasele.Application.Services
             if (Enum.TryParse<TripStatus>(dto.Status, true, out var status))
             {
                 trip.Status = status;
-
-                // Assigned: Driver delivered to cleaner -> Orders are Collected
-                if (status == TripStatus.Assigned)
-                {
-                    if (trip.CleanerId == null)
-                    {
-                        throw new InvalidOperationException($"Cannot move trip #{trip.ReferenceNumber} to Assigned. A cleaner must be selected first.");
-                    }
-
-                    // Ensure items are recorded before marking as Collected at cleaner
-                    var ordersWithoutItems = trip.Orders.Where(o => o.Items == null || !o.Items.Any()).ToList();
-                    if (ordersWithoutItems.Any())
-                    {
-                        var orderRefs = string.Join(", ", ordersWithoutItems.Select(o => o.ReferenceNumber));
-                        throw new InvalidOperationException($"Cannot finalize collection at cleaner. Order(s) {orderRefs} have no items recorded.");
-                    }
-
-                    foreach (var order in trip.Orders)
-                    {
-                        order.Status = OrderStatus.Collected;
-                    }
-                }
-                // Delivered: Driver finished delivering -> Orders are Delivered
-                else if (status == TripStatus.Delivered)
-                {
-                    foreach (var order in trip.Orders)
-                    {
-                        order.Status = OrderStatus.Delivered;
-                    }
-                }
-                // Delivering: Driver starting delivery journey
-                else if (status == TripStatus.Delivering)
-                {
-                    foreach (var order in trip.Orders)
-                    {
-                         // Maintain state or mark as Shipped/Delivering if such status existed, for now they stay Collected or move to InProgress
-                         // No specific order status change requested for start of delivery, but InProgress is safe.
-                    }
-                }
-
                 await _tripRepository.UpdateAsync(trip);
             }
-            else
-            {
-                 throw new Exception("Invalid status");
-            }
-
             return MapToDto(trip);
         }
 
@@ -173,24 +238,18 @@ namespace Ghasele.Application.Services
         {
             var trip = await _tripRepository.GetByIdAsync(id);
             if (trip == null) throw new Exception("Trip not found");
-
             trip.CleanerId = dto.CleanerId;
-            
             await _tripRepository.UpdateAsync(trip);
-            var updatedTrip = await _tripRepository.GetByIdAsync(id); 
-            return MapToDto(updatedTrip!); 
+            return MapToDto(trip);
         }
 
         public async Task<TripDto> UpdateTripDriverAsync(Guid id, UpdateTripDriverDto dto)
         {
             var trip = await _tripRepository.GetByIdAsync(id);
             if (trip == null) throw new Exception("Trip not found");
-
             trip.AssignedDriverId = dto.DriverId;
-            
             await _tripRepository.UpdateAsync(trip);
-            var updatedTrip = await _tripRepository.GetByIdAsync(id); 
-            return MapToDto(updatedTrip!); 
+            return MapToDto(trip);
         }
 
         public async Task<List<TripDto>> GetAllTripsAsync()
@@ -220,6 +279,8 @@ namespace Ghasele.Application.Services
                 RouteJson = trip.RouteJson,
                 StartLocationLat = trip.StartLocationLat,
                 StartLocationLng = trip.StartLocationLng,
+                CleanerLat = trip.Cleaner?.Latitude,
+                CleanerLng = trip.Cleaner?.Longitude,
                 OrderCount = trip.Orders.Count,
                 Orders = trip.Orders.Select(OrderService.MapToDto).ToList()
             };

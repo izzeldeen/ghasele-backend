@@ -50,6 +50,8 @@ namespace Ghasele.Application.DTOs
         public string? RouteJson { get; set; }
         public double? StartLocationLat { get; set; }
         public double? StartLocationLng { get; set; }
+        public double? CleanerLat { get; set; }
+        public double? CleanerLng { get; set; }
         public int OrderCount { get; set; }
         public List<OrderDto> Orders { get; set; } = new List<OrderDto>();
     }

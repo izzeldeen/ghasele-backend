@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -82,6 +83,62 @@ namespace Ghasele.API.Controllers
             try
             {
                 var trip = await _tripService.UpdateTripDriverAsync(id, dto);
+                return Ok(trip);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("orders/{orderId}/collect")]
+        public async Task<IActionResult> CollectOrder(Guid orderId)
+        {
+            try
+            {
+                var trip = await _tripService.CollectOrderAsync(orderId);
+                return Ok(trip);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id}/deliver-to-cleaner")]
+        public async Task<IActionResult> DeliverToCleaner(Guid id)
+        {
+            try
+            {
+                var trip = await _tripService.DeliverToCleanerAsync(id);
+                return Ok(trip);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("orders/{orderId}/status")]
+        public async Task<IActionResult> UpdateOrderInTripStatus(Guid orderId, [FromBody] OrderStatus status)
+        {
+            try
+            {
+                var trip = await _tripService.UpdateOrderInTripStatusAsync(orderId, status);
+                return Ok(trip);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("orders/{orderId}/deliver")]
+        public async Task<IActionResult> DeliverOrder(Guid orderId)
+        {
+            try
+            {
+                var trip = await _tripService.DeliverOrderAsync(orderId);
                 return Ok(trip);
             }
             catch (Exception ex)

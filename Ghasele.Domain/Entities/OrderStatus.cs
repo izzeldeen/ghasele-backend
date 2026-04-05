@@ -2,10 +2,12 @@ namespace Ghasele.Domain.Entities
 {
     public enum OrderStatus
     {
-        Pending,
-        InProgress,
+        PendingCollection,
+        Assigned,
         Collected,
-        Completed,
+        Cleaning,
+        Ready,
+        OutForDelivery,
         Delivered,
         Cancelled
     }

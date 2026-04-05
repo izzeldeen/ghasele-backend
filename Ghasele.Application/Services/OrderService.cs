@@ -14,12 +14,14 @@ namespace Ghasele.Application.Services
         private readonly IOrderRepository _orderRepository;
         private readonly IItemTypeRepository _itemTypeRepository;
         private readonly IMarketingCodeRepository _marketingCodeRepository;
+        private readonly ITripRepository _tripRepository;
 
-        public OrderService(IOrderRepository orderRepository, IItemTypeRepository itemTypeRepository, IMarketingCodeRepository marketingCodeRepository)
+        public OrderService(IOrderRepository orderRepository, IItemTypeRepository itemTypeRepository, IMarketingCodeRepository marketingCodeRepository, ITripRepository tripRepository)
         {
             _orderRepository = orderRepository;
             _itemTypeRepository = itemTypeRepository;
             _marketingCodeRepository = marketingCodeRepository;
+            _tripRepository = tripRepository;
         }
 
         public async Task<OrderDto> CreateOrderAsync(CreateOrderDto dto)
@@ -39,7 +41,7 @@ namespace Ghasele.Application.Services
                 DeliveryAmount = dto.DeliveryAmount,
                 CleanerAmount = dto.CleanerAmount,
                 ReferenceNumber = $"GH-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N").Substring(0, 4).ToUpper()}",
-                Status = OrderStatus.Pending,
+                Status = OrderStatus.PendingCollection,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -179,6 +181,17 @@ namespace Ghasele.Application.Services
 
             // Update order separately
              await _orderRepository.UpdateAsync(order); // Use async update
+
+            // Auto-transition trip status if all orders are Collected
+            if (order.TripId.HasValue)
+            {
+                var trip = await _tripRepository.GetByIdAsync(order.TripId.Value);
+                if (trip != null && trip.Orders.All(o => o.Status == OrderStatus.Collected))
+                {
+                    trip.Status = TripStatus.Collected;
+                    await _tripRepository.UpdateAsync(trip);
+                }
+            }
 
             // Reload with all includes for the DTO
             var updatedOrder = await _orderRepository.GetByIdAsync(orderId);
