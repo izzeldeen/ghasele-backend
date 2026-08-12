@@ -3,17 +3,20 @@ using System;
 using Ghasele.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Ghasele.Infrastructure.Migrations
+namespace Ghasele.Infrastructure.Migrations.PostgreSql
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260606122210_AddResetPasswordOtp")]
+    partial class AddResetPasswordOtp
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -505,9 +508,6 @@ namespace Ghasele.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AppleUserId")
-                        .HasColumnType("text");
-
                     b.Property<string>("Email")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -524,9 +524,6 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsPhoneVerified")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
@@ -534,12 +531,6 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("RegistrationOtp")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RegistrationOtpExpiry")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ResetPasswordOtp")
                         .HasColumnType("text");

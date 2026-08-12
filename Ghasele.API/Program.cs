@@ -11,6 +11,8 @@ using Microsoft.OpenApi.Models; // Corrected namespace
 using Swashbuckle.AspNetCore.Swagger;
 using Swashbuckle.AspNetCore.SwaggerUI;
 using Ghasele.API.Middleware;
+using WhatsappBusiness.CloudApi.Configurations;
+using WhatsappBusiness.CloudApi.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +100,27 @@ builder.Services.AddScoped<IDriverRepository, DriverRepository>();
 builder.Services.AddScoped<IDriverService, DriverService>();
 builder.Services.AddScoped<IMarketingCodeRepository, MarketingCodeRepository>();
 builder.Services.AddScoped<IMarketingCodeService, MarketingCodeService>();
+var whatsAppSection = builder.Configuration.GetSection("WhatsAppBusinessCloudApiConfiguration");
+var whatsAppAccessToken = whatsAppSection["AccessToken"];
+
+if (!string.IsNullOrWhiteSpace(whatsAppAccessToken))
+{
+    var whatsAppConfig = new WhatsAppBusinessCloudApiConfig
+    {
+        WhatsAppBusinessPhoneNumberId = whatsAppSection["WhatsAppBusinessPhoneNumberId"] ?? string.Empty,
+        WhatsAppBusinessAccountId = whatsAppSection["WhatsAppBusinessAccountId"] ?? string.Empty,
+        WhatsAppBusinessId = whatsAppSection["WhatsAppBusinessId"] ?? string.Empty,
+        AccessToken = whatsAppAccessToken
+    };
+
+    builder.Services.AddWhatsAppBusinessCloudApiService(whatsAppConfig);
+    builder.Services.AddScoped<IWhatsAppService, Ghasele.Infrastructure.Services.WhatsAppCloudApiService>();
+}
+else
+{
+    // No WhatsApp credentials configured (e.g. local development) - fall back to console logging.
+    builder.Services.AddScoped<IWhatsAppService, Ghasele.Infrastructure.Services.MockWhatsAppService>();
+}
 
 // JWT Authentication Configuration
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

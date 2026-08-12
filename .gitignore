@@ -486,3 +486,4 @@ $RECYCLE.BIN/
 # Secrets
 Ghasele.API/firebase/*.json
 appsettings.Development.json
+/scripts/purge-orders.sql

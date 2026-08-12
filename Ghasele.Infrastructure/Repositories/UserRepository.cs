@@ -25,6 +25,11 @@ namespace Ghasele.Infrastructure.Repositories
             return await _context.Users.SingleOrDefaultAsync(u => u.PhoneNumber == phoneNumber && !u.IsDeleted);
         }
 
+        public async Task<User?> GetByAppleUserIdAsync(string appleUserId)
+        {
+            return await _context.Users.SingleOrDefaultAsync(u => u.AppleUserId == appleUserId && !u.IsDeleted);
+        }
+
         public async Task<User?> GetByIdAsync(Guid id)
         {
             return await _context.Users.FindAsync(id);
