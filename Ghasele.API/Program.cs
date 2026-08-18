@@ -11,6 +11,8 @@ using Microsoft.OpenApi.Models; // Corrected namespace
 using Swashbuckle.AspNetCore.Swagger;
 using Swashbuckle.AspNetCore.SwaggerUI;
 using Ghasele.API.Middleware;
+using Ghasele.API.Localization;
+using Ghasele.Application.Localization;
 using WhatsappBusiness.CloudApi.Configurations;
 using WhatsappBusiness.CloudApi.Extensions;
 
@@ -22,7 +24,14 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        // Without this, Arabic message text is emitted as \uXXXX escapes.
+        options.JsonSerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
     });
+
+// Localization: resolves the caller's language from Accept-Language and turns ErrorCodes into text.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<IErrorLocalizer, ErrorLocalizer>();
+builder.Services.AddScoped<IRequestLocalizer, RequestLocalizer>();
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

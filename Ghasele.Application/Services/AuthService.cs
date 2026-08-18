@@ -6,7 +6,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
@@ -39,7 +41,7 @@ namespace Ghasele.Application.Services
             var existingPhone = await _userRepository.GetByPhoneNumberAsync(request.PhoneNumber);
             if (existingPhone != null)
             {
-                throw new Exception("User with this phone number already exists.");
+                throw new AppException(ErrorCodes.PhoneAlreadyExists, 409);
             }
 
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
@@ -71,7 +73,9 @@ namespace Ghasele.Application.Services
             var user = await _userRepository.GetByPhoneNumberAsync(request.PhoneNumber);
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                throw new Exception("Invalid phone number or password.");
+                // Deliberately 400, not 401: the admin client treats every 401 as an expired
+                // session and force-logs-out, which would be wrong for a failed login attempt.
+                throw new AppException(ErrorCodes.InvalidCredentials);
             }
 
             var token = GenerateJwtToken(user);
@@ -83,7 +87,7 @@ namespace Ghasele.Application.Services
         {
             if (string.IsNullOrWhiteSpace(request.IdentityToken))
             {
-                throw new Exception("Missing Apple identity token.");
+                throw new AppException(ErrorCodes.AppleTokenMissing);
             }
 
             var (appleUserId, tokenEmail) = await ValidateAppleIdentityTokenAsync(request.IdentityToken);
@@ -177,13 +181,13 @@ namespace Ghasele.Application.Services
             }
             catch (Exception ex)
             {
-                throw new Exception($"Invalid Apple identity token: {ex.Message}");
+                throw new AppException(ErrorCodes.AppleTokenInvalid, 401, ex);
             }
 
             var sub = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (string.IsNullOrEmpty(sub))
             {
-                throw new Exception("Apple identity token has no subject.");
+                throw new AppException(ErrorCodes.AppleTokenNoSubject, 401);
             }
 
             var email = principal.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
@@ -217,12 +221,12 @@ namespace Ghasele.Application.Services
             var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
             if (user == null)
             {
-                throw new Exception("User with this phone number does not exist.");
+                throw AppException.NotFound(ErrorCodes.PhoneNotRegistered);
             }
 
             if (user.IsPhoneVerified)
             {
-                throw new Exception("Phone number is already verified.");
+                throw new AppException(ErrorCodes.PhoneAlreadyVerified);
             }
 
             var otp = GenerateOtp();
@@ -250,7 +254,7 @@ namespace Ghasele.Application.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null || user.IsDeleted)
             {
-                throw new Exception("Account not found.");
+                throw AppException.NotFound(ErrorCodes.AccountNotFound);
             }
 
             await _userRepository.DeleteAsync(userId);
@@ -261,7 +265,7 @@ namespace Ghasele.Application.Services
             var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
             if (user == null)
             {
-                throw new Exception("User with this phone number does not exist.");
+                throw AppException.NotFound(ErrorCodes.PhoneNotRegistered);
             }
 
             var otp = GenerateOtp();
@@ -296,12 +300,12 @@ namespace Ghasele.Application.Services
             var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
             if (user == null)
             {
-                throw new Exception("User not found.");
+                throw AppException.NotFound(ErrorCodes.UserNotFound);
             }
 
             if (user.ResetPasswordOtp != otp || user.ResetPasswordOtpExpiry < DateTime.UtcNow)
             {
-                throw new Exception("Invalid or expired OTP.");
+                throw new AppException(ErrorCodes.OtpInvalidOrExpired);
             }
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);

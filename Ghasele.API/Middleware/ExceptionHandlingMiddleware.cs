@@ -1,3 +1,6 @@
+using Ghasele.API.Localization;
+using Ghasele.Application.Exceptions;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Infrastructure.Data;
 using Microsoft.AspNetCore.Http;
@@ -48,6 +51,12 @@ namespace Ghasele.API.Middleware
                 inner = inner.InnerException;
             }
 
+            // An AppException is a deliberate, user-facing error; anything else is a bug or an
+            // infrastructure failure whose details must not reach the client.
+            var appException = ex as AppException;
+            var statusCode = appException?.StatusCode ?? (int)HttpStatusCode.InternalServerError;
+            var errorCode = appException?.ErrorCode ?? ErrorCodes.InternalError;
+
             // Create scope to resolve DbContext
             try
             {
@@ -60,9 +69,10 @@ namespace Ghasele.API.Middleware
                         UserId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value,
                         RequestPath = context.Request.Path,
                         RequestMethod = context.Request.Method,
+                        // The audit trail keeps the untranslated detail for diagnosis.
                         ExceptionMessage = fullMessage,
                         StackTrace = ex.StackTrace,
-                        StatusCode = (int)HttpStatusCode.InternalServerError
+                        StatusCode = statusCode
                     };
 
                     dbContext.AuditLogs.Add(auditLog);
@@ -74,18 +84,34 @@ namespace Ghasele.API.Middleware
                 _logger.LogError(logEx, "Failed to log exception to database.");
             }
 
+            if (context.Response.HasStarted)
+            {
+                // Headers are already on the wire; rewriting the response would corrupt it.
+                _logger.LogWarning("Response already started; could not write error payload.");
+                return;
+            }
+
+            var localizer = context.RequestServices.GetRequiredService<IRequestLocalizer>();
+            var language = localizer.Language;
+
             context.Response.ContentType = "application/json";
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            context.Response.StatusCode = statusCode;
+            context.Response.Headers.ContentLanguage = language;
 
             var errorDetails = new ErrorDetails()
             {
-                StatusCode = context.Response.StatusCode,
-                Message = fullMessage // Providing full message for debugging
+                StatusCode = statusCode,
+                ErrorCode = errorCode,
+                Message = appException is not null
+                    ? localizer.L(appException.ErrorCode, appException.Args)
+                    : localizer.L(ErrorCodes.InternalError)
             };
 
-            await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(errorDetails, new System.Text.Json.JsonSerializerOptions 
-            { 
-                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase 
+            await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(errorDetails, new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                // Arabic must survive serialization as readable UTF-8 rather than \uXXXX escapes.
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             }));
         }
     }
@@ -93,6 +119,10 @@ namespace Ghasele.API.Middleware
     public class ErrorDetails
     {
         public int StatusCode { get; set; }
+
+        /// <summary>Stable machine-readable identifier, safe for clients to switch on.</summary>
+        public string ErrorCode { get; set; } = string.Empty;
+
         public string Message { get; set; } = string.Empty;
     }
 }

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -28,12 +30,12 @@ namespace Ghasele.Application.Services
         {
             if (dto.CleanerId == null || dto.DriverId == null)
             {
-                throw new ArgumentException("Cleaner and Driver must be selected for trip creation.");
+                throw new AppException(ErrorCodes.TripCleanerAndDriverRequired);
             }
 
             if (dto.OrderIds == null || !dto.OrderIds.Any())
             {
-                throw new ArgumentException("At least one order must be selected for trip creation.");
+                throw new AppException(ErrorCodes.TripOrdersRequired);
             }
 
             var trip = new Trip
@@ -55,7 +57,7 @@ namespace Ghasele.Application.Services
                 {
                     if (order.TripId != null)
                     {
-                        throw new InvalidOperationException($"Order {order.ReferenceNumber} is already assigned to another trip.");
+                        throw new AppException(ErrorCodes.TripOrderAlreadyAssigned, 400, order.ReferenceNumber);
                     }
                     order.Status = OrderStatus.Assigned;
                     trip.Orders.Add(order);
@@ -85,11 +87,11 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> CollectOrderAsync(Guid orderId)
         {
             var order = await _orderRepository.GetByIdAsync(orderId);
-            if (order == null) throw new Exception("Order not found");
-            if (order.TripId == null) throw new Exception("Order is not part of a trip");
+            if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
+            if (order.TripId == null) throw new AppException(ErrorCodes.OrderNotPartOfTrip);
 
             var trip = await _tripRepository.GetByIdAsync(order.TripId.Value);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
 
             // Check if this is the "next" order to be collected (sequential logic)
             // For now, we allow any order in PendingCollection, but the UI should enforce sequence.
@@ -113,11 +115,11 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> DeliverToCleanerAsync(Guid tripId)
         {
             var trip = await _tripRepository.GetByIdAsync(tripId);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
 
             if (trip.Status != TripStatus.Collected)
             {
-                throw new InvalidOperationException("Trip must be in Collected status before delivering to cleaner.");
+                throw new AppException(ErrorCodes.TripMustBeCollected);
             }
 
             trip.Status = TripStatus.Cleaning;
@@ -133,14 +135,14 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> UpdateOrderInTripStatusAsync(Guid orderId, Ghasele.Domain.Entities.OrderStatus status)
         {
             var order = await _orderRepository.GetByIdAsync(orderId);
-            if (order == null) throw new Exception("Order not found");
-            if (order.TripId == null) throw new Exception("Order is not part of a trip");
+            if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
+            if (order.TripId == null) throw new AppException(ErrorCodes.OrderNotPartOfTrip);
 
             order.Status = status;
             await _orderRepository.UpdateAsync(order);
 
             var trip = await _tripRepository.GetByIdAsync(order.TripId.Value);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
 
             // Side Effects
             if (status == OrderStatus.OutForDelivery)
@@ -172,11 +174,11 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> DeliverOrderAsync(Guid orderId)
         {
             var order = await _orderRepository.GetByIdAsync(orderId);
-            if (order == null) throw new Exception("Order not found");
-            if (order.TripId == null) throw new Exception("Order is not part of a trip");
+            if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
+            if (order.TripId == null) throw new AppException(ErrorCodes.OrderNotPartOfTrip);
 
             var trip = await _tripRepository.GetByIdAsync(order.TripId.Value);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
 
             order.Status = OrderStatus.Delivered;
             await _orderRepository.UpdateAsync(order);
@@ -194,7 +196,7 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> AssignOrdersToTripAsync(AssignOrdersToTripDto dto)
         {
             var trip = await _tripRepository.GetByIdAsync(dto.TripId);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
 
             foreach (var orderId in dto.OrderIds)
             {
@@ -203,7 +205,7 @@ namespace Ghasele.Application.Services
                 {
                     if (order.TripId != null && order.TripId != dto.TripId)
                     {
-                         throw new InvalidOperationException($"Order {order.ReferenceNumber} is already assigned to another trip.");
+                         throw new AppException(ErrorCodes.TripOrderAlreadyAssigned, 400, order.ReferenceNumber);
                     }
                     order.Status = OrderStatus.Assigned;
                     if (!trip.Orders.Any(o => o.Id == orderId))
@@ -224,7 +226,7 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> UpdateTripStatusAsync(Guid id, UpdateTripStatusDto dto)
         {
             var trip = await _tripRepository.GetByIdAsync(id);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
 
             if (Enum.TryParse<TripStatus>(dto.Status, true, out var status))
             {
@@ -237,7 +239,7 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> UpdateTripCleanerAsync(Guid id, UpdateTripCleanerDto dto)
         {
             var trip = await _tripRepository.GetByIdAsync(id);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
             trip.CleanerId = dto.CleanerId;
             await _tripRepository.UpdateAsync(trip);
             return MapToDto(trip);
@@ -246,7 +248,7 @@ namespace Ghasele.Application.Services
         public async Task<TripDto> UpdateTripDriverAsync(Guid id, UpdateTripDriverDto dto)
         {
             var trip = await _tripRepository.GetByIdAsync(id);
-            if (trip == null) throw new Exception("Trip not found");
+            if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
             trip.AssignedDriverId = dto.DriverId;
             await _tripRepository.UpdateAsync(trip);
             return MapToDto(trip);

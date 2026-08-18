@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class DriversController : ControllerBase
+    public class DriversController : ApiControllerBase
     {
         private readonly IDriverService _driverService;
 
@@ -30,7 +31,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -44,7 +45,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -54,12 +55,12 @@ namespace Ghasele.API.Controllers
             try
             {
                 var driver = await _driverService.GetDriverByIdAsync(id);
-                if (driver == null) return NotFound(new { message = "Driver not found" });
+                if (driver == null) return NotFound(new { errorCode = ErrorCodes.DriverNotFound, message = L(ErrorCodes.DriverNotFound) });
                 return Ok(driver);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -73,7 +74,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -83,11 +84,11 @@ namespace Ghasele.API.Controllers
             try
             {
                 await _driverService.DeleteDriverAsync(id);
-                return Ok(new { message = "Driver deleted successfully" });
+                return Ok(new { message = L(ErrorCodes.DriverDeleted) });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
     }

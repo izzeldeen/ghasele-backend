@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize] // Should probably be restricted to Admins later
-    public class MarketingCodesController : ControllerBase
+    public class MarketingCodesController : ApiControllerBase
     {
         private readonly IMarketingCodeService _marketingCodeService;
 
@@ -39,7 +40,7 @@ namespace Ghasele.API.Controllers
         public async Task<IActionResult> GetByCode(string code)
         {
             var marketingCode = await _marketingCodeService.GetByCodeAsync(code);
-            if (marketingCode == null) return NotFound(new { message = "Invalid or inactive marketing code" });
+            if (marketingCode == null) return NotFound(new { errorCode = ErrorCodes.MarketingCodeInvalidOrInactive, message = L(ErrorCodes.MarketingCodeInvalidOrInactive) });
             return Ok(marketingCode);
         }
 
@@ -53,7 +54,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -67,7 +68,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -75,7 +76,7 @@ namespace Ghasele.API.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             await _marketingCodeService.DeleteAsync(id);
-            return Ok(new { message = "Marketing code deleted" });
+            return Ok(new { message = L(ErrorCodes.MarketingCodeDeleted) });
         }
     }
 }

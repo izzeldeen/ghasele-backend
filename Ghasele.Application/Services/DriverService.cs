@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -47,7 +49,7 @@ namespace Ghasele.Application.Services
         public async Task<DriverDto> UpdateDriverAsync(Guid id, UpdateDriverDto dto)
         {
             var driver = await _driverRepository.GetByIdAsync(id);
-            if (driver == null) throw new Exception("Driver not found");
+            if (driver == null) throw AppException.NotFound(ErrorCodes.DriverNotFound);
 
             if (!string.IsNullOrEmpty(dto.Name)) driver.Name = dto.Name;
             if (!string.IsNullOrEmpty(dto.PhoneNumber)) driver.PhoneNumber = dto.PhoneNumber;

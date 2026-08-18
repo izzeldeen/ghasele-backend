@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -28,7 +30,7 @@ namespace Ghasele.Application.Services
         {
             if (await _orderRepository.HasPendingOrderAsync(dto.UserId))
             {
-                throw new Exception("You already have a pending order. Please wait for it to be processed.");
+                throw new AppException(ErrorCodes.OrderPendingExists);
             }
 
             var order = new Order
@@ -89,7 +91,7 @@ namespace Ghasele.Application.Services
             var order = await _orderRepository.GetByIdForUpdateAsync(orderId);
             if (order == null)
             {
-                throw new Exception("Order not found");
+                throw AppException.NotFound(ErrorCodes.OrderNotFound);
             }
 
             // Need to calculate price based on ItemTypes
@@ -201,7 +203,7 @@ namespace Ghasele.Application.Services
         public async Task<OrderDto> UpdateOrderAsync(Guid id, UpdateOrderDto dto)
         {
             var order = await _orderRepository.GetByIdAsync(id);
-            if (order == null) throw new Exception("Order not found");
+            if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
 
             if (dto.Lat.HasValue) order.Lat = dto.Lat.Value;
             if (dto.Long.HasValue) order.Long = dto.Long.Value;

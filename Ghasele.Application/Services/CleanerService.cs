@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -49,7 +51,7 @@ namespace Ghasele.Application.Services
         public async Task<CleanerDto> UpdateCleanerAsync(Guid id, UpdateCleanerDto dto)
         {
             var cleaner = await _cleanerRepository.GetByIdAsync(id);
-            if (cleaner == null) throw new Exception("Cleaner not found");
+            if (cleaner == null) throw AppException.NotFound(ErrorCodes.CleanerNotFound);
 
             if (!string.IsNullOrEmpty(dto.Name)) cleaner.Name = dto.Name;
             if (dto.Note != null) cleaner.Note = dto.Note;

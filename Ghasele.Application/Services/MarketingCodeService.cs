@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -53,7 +55,7 @@ namespace Ghasele.Application.Services
         public async Task<MarketingCodeDto> UpdateAsync(Guid id, UpdateMarketingCodeDto dto)
         {
             var code = await _marketingCodeRepository.GetByIdAsync(id);
-            if (code == null) throw new Exception("Marketing code not found");
+            if (code == null) throw AppException.NotFound(ErrorCodes.MarketingCodeNotFound);
 
             if (dto.DiscountPercentage.HasValue) code.DiscountPercentage = dto.DiscountPercentage.Value;
             if (dto.SharePercentage.HasValue) code.SharePercentage = dto.SharePercentage.Value;

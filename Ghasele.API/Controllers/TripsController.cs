@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class TripsController : ControllerBase
+    public class TripsController : ApiControllerBase
     {
         private readonly ITripService _tripService;
 
@@ -31,7 +32,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -45,7 +46,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -59,7 +60,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -73,7 +74,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -87,7 +88,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -101,7 +102,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -115,7 +116,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -129,7 +130,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -143,7 +144,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -157,7 +158,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -167,12 +168,12 @@ namespace Ghasele.API.Controllers
             try
             {
                 var trip = await _tripService.GetTripByIdAsync(id);
-                if (trip == null) return NotFound(new { message = "Trip not found" });
+                if (trip == null) return NotFound(new { errorCode = ErrorCodes.TripNotFound, message = L(ErrorCodes.TripNotFound) });
                 return Ok(trip);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
     }

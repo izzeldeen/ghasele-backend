@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,7 +11,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     // [Authorize] // Uncomment if you want to protect this route
-    public class ItemTypesController : ControllerBase
+    public class ItemTypesController : ApiControllerBase
     {
         private readonly IItemTypeService _service;
 
@@ -29,7 +30,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -43,7 +44,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -57,7 +58,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -71,7 +72,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class CleanersController : ControllerBase
+    public class CleanersController : ApiControllerBase
     {
         private readonly ICleanerService _cleanerService;
 
@@ -30,7 +31,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -44,7 +45,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -54,12 +55,12 @@ namespace Ghasele.API.Controllers
             try
             {
                 var cleaner = await _cleanerService.GetCleanerByIdAsync(id);
-                if (cleaner == null) return NotFound(new { message = "Cleaner not found" });
+                if (cleaner == null) return NotFound(new { errorCode = ErrorCodes.CleanerNotFound, message = L(ErrorCodes.CleanerNotFound) });
                 return Ok(cleaner);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -73,7 +74,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -83,11 +84,11 @@ namespace Ghasele.API.Controllers
             try
             {
                 await _cleanerService.DeleteCleanerAsync(id);
-                return Ok(new { message = "Cleaner deleted successfully" });
+                return Ok(new { message = L(ErrorCodes.CleanerDeleted) });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Ghasele.Application.Localization;
 using Ghasele.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +27,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [AllowAnonymous]
-    public class MaintenanceController : ControllerBase
+    public class MaintenanceController : ApiControllerBase
     {
         private readonly ApplicationDbContext _db;
         private readonly IConfiguration _config;
@@ -63,7 +64,7 @@ namespace Ghasele.API.Controllers
             if (string.IsNullOrWhiteSpace(expectedToken) || token != expectedToken)
             {
                 _logger.LogWarning("Purge attempt from {Caller} with a bad token.", caller);
-                return Unauthorized(new { message = "Invalid token." });
+                return Unauthorized(new { errorCode = ErrorCodes.InvalidToken, message = L(ErrorCodes.InvalidToken) });
             }
 
             _logger.LogWarning("ORDER PURGE STARTED by {Caller}.", caller);
@@ -88,7 +89,7 @@ namespace Ghasele.API.Controllers
 
                 return Ok(new
                 {
-                    message = "Purge complete.",
+                    message = L(ErrorCodes.PurgeComplete),
                     deleted = new
                     {
                         orderItems,
@@ -101,7 +102,9 @@ namespace Ghasele.API.Controllers
             {
                 await tx.RollbackAsync();
                 _logger.LogError(ex, "ORDER PURGE FAILED - rolled back.");
-                return StatusCode(500, new { message = "Purge failed and was rolled back.", error = ex.Message });
+                // The raw detail stays in the payload: this endpoint is token-guarded and exists for
+                // an operator who needs to know why the purge failed.
+                return StatusCode(500, new { message = L(ErrorCodes.PurgeFailed), error = ex.Message });
             }
         }
 
@@ -116,7 +119,7 @@ namespace Ghasele.API.Controllers
 
             var expectedToken = _config["Maintenance:PurgeToken"];
             if (string.IsNullOrWhiteSpace(expectedToken) || token != expectedToken)
-                return Unauthorized(new { message = "Invalid token." });
+                return Unauthorized(new { errorCode = ErrorCodes.InvalidToken, message = L(ErrorCodes.InvalidToken) });
 
             return Ok(new
             {

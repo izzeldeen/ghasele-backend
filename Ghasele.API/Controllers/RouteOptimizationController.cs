@@ -10,7 +10,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/route-optimization")]
     [Authorize]
-    public class RouteOptimizationController : ControllerBase
+    public class RouteOptimizationController : ApiControllerBase
     {
         private readonly IRouteOptimizationService _routeOptimizationService;
 
@@ -29,7 +29,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
     }

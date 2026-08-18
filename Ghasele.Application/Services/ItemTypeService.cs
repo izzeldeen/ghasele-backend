@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -65,7 +67,7 @@ namespace Ghasele.Application.Services
         public async Task<ItemTypeDto> UpdateItemTypeAsync(Guid id, CreateItemTypeDto dto)
         {
             var item = await _repository.GetByIdAsync(id);
-            if (item == null) throw new Exception("Item type not found");
+            if (item == null) throw AppException.NotFound(ErrorCodes.ItemTypeNotFound);
 
             item.TypeName = dto.TypeName;
             item.IronPrice = dto.IronPrice;

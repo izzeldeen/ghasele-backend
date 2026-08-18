@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize] // Require authentication for all order endpoints
-    public class OrdersController : ControllerBase
+    public class OrdersController : ApiControllerBase
     {
         private readonly IOrderService _orderService;
 
@@ -30,7 +31,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -44,7 +45,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
         [HttpGet]
@@ -57,7 +58,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -67,12 +68,12 @@ namespace Ghasele.API.Controllers
             try
             {
                 var order = await _orderService.GetOrderByIdAsync(id);
-                if (order == null) return NotFound(new { message = "Order not found" });
+                if (order == null) return NotFound(new { errorCode = ErrorCodes.OrderNotFound, message = L(ErrorCodes.OrderNotFound) });
                 return Ok(order);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
         [HttpPost("{id}/items")]
@@ -85,7 +86,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -99,7 +100,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -109,11 +110,11 @@ namespace Ghasele.API.Controllers
             try
             {
                 await _orderService.DeleteOrderAsync(id);
-                return Ok(new { message = "Order deleted successfully" });
+                return Ok(new { message = L(ErrorCodes.OrderDeleted) });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
     }

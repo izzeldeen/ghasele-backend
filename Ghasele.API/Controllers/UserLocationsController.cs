@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,7 +11,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/user-locations")]
     [Authorize]
-    public class UserLocationsController : ControllerBase
+    public class UserLocationsController : ApiControllerBase
     {
         private readonly IUserLocationService _userLocationService;
 
@@ -29,7 +30,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -43,7 +44,7 @@ namespace Ghasele.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
 
@@ -53,11 +54,11 @@ namespace Ghasele.API.Controllers
             try
             {
                 await _userLocationService.DeleteLocationAsync(id);
-                return Ok(new { message = "Location deleted successfully" });
+                return Ok(new { message = L(ErrorCodes.LocationDeleted) });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(ErrorBody(ex));
             }
         }
     }
