@@ -37,6 +37,11 @@ namespace Ghasele.Infrastructure.Repositories
             return await _context.Drivers.FindAsync(id);
         }
 
+        public async Task<Driver?> GetByUserIdAsync(Guid userId)
+        {
+            return await _context.Drivers.FirstOrDefaultAsync(d => d.UserId == userId);
+        }
+
         public async Task UpdateAsync(Driver driver)
         {
             _context.Drivers.Update(driver);

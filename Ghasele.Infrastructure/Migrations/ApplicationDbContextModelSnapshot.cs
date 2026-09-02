@@ -22,6 +22,37 @@ namespace Ghasele.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Ghasele.Domain.Entities.AppSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ExpressDeliveryPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("NormalDeliveryPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AppSettings");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a51e7c10-0000-4000-8000-000000000001"),
+                            ExpressDeliveryPrice = 1.00m,
+                            NormalDeliveryPrice = 1.00m,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("Ghasele.Domain.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -75,7 +106,12 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NameEn")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -88,6 +124,65 @@ namespace Ghasele.Infrastructure.Migrations
                     b.ToTable("Cleaners");
                 });
 
+            modelBuilder.Entity("Ghasele.Domain.Entities.DeliveryWindow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Capacity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(20);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartTime");
+
+                    b.ToTable("DeliveryWindows");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-4000-8000-000000000001"),
+                            Capacity = 20,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            EndTime = new TimeOnly(14, 0, 0),
+                            IsActive = true,
+                            StartTime = new TimeOnly(13, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-4000-8000-000000000002"),
+                            Capacity = 20,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            EndTime = new TimeOnly(16, 0, 0),
+                            IsActive = true,
+                            StartTime = new TimeOnly(15, 0, 0)
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-4000-8000-000000000003"),
+                            Capacity = 20,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            EndTime = new TimeOnly(20, 0, 0),
+                            IsActive = true,
+                            StartTime = new TimeOnly(19, 0, 0)
+                        });
+                });
+
             modelBuilder.Entity("Ghasele.Domain.Entities.Driver", b =>
                 {
                     b.Property<Guid>("Id")
@@ -97,7 +192,12 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NameEn")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -110,7 +210,12 @@ namespace Ghasele.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Drivers");
                 });
@@ -148,7 +253,12 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("TypeName")
+                    b.Property<string>("TypeNameAr")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TypeNameEn")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -168,7 +278,8 @@ namespace Ghasele.Infrastructure.Migrations
                             IronCost = 0.20m,
                             IronPrice = 0.50m,
                             IsDeleted = false,
-                            TypeName = "قميص"
+                            TypeNameAr = "قميص",
+                            TypeNameEn = "Shirt"
                         },
                         new
                         {
@@ -180,7 +291,8 @@ namespace Ghasele.Infrastructure.Migrations
                             IronCost = 0.30m,
                             IronPrice = 0.75m,
                             IsDeleted = false,
-                            TypeName = "بنطلون"
+                            TypeNameAr = "بنطلون",
+                            TypeNameEn = "Trousers"
                         },
                         new
                         {
@@ -192,7 +304,8 @@ namespace Ghasele.Infrastructure.Migrations
                             IronCost = 1.00m,
                             IronPrice = 2.50m,
                             IsDeleted = false,
-                            TypeName = "بدلة رجالية"
+                            TypeNameAr = "بدلة رجالية",
+                            TypeNameEn = "Men's Suit"
                         },
                         new
                         {
@@ -204,7 +317,8 @@ namespace Ghasele.Infrastructure.Migrations
                             IronCost = 1.50m,
                             IronPrice = 4.00m,
                             IsDeleted = false,
-                            TypeName = "فستان سهرة"
+                            TypeNameAr = "فستان سهرة",
+                            TypeNameEn = "Evening Dress"
                         },
                         new
                         {
@@ -216,7 +330,8 @@ namespace Ghasele.Infrastructure.Migrations
                             IronCost = 0.60m,
                             IronPrice = 1.50m,
                             IsDeleted = false,
-                            TypeName = "جاكيت"
+                            TypeNameAr = "جاكيت",
+                            TypeNameEn = "Jacket"
                         },
                         new
                         {
@@ -228,7 +343,8 @@ namespace Ghasele.Infrastructure.Migrations
                             IronCost = 0.00m,
                             IronPrice = 0.00m,
                             IsDeleted = false,
-                            TypeName = "لحاف/بطانية كبير"
+                            TypeNameAr = "لحاف/بطانية كبير",
+                            TypeNameEn = "Large Blanket"
                         },
                         new
                         {
@@ -240,7 +356,8 @@ namespace Ghasele.Infrastructure.Migrations
                             IronCost = 0.40m,
                             IronPrice = 1.00m,
                             IsDeleted = false,
-                            TypeName = "ثوب/دشداشة"
+                            TypeNameAr = "ثوب/دشداشة",
+                            TypeNameEn = "Thobe"
                         });
                 });
 
@@ -373,6 +490,11 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<Guid?>("TripId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -415,6 +537,46 @@ namespace Ghasele.Infrastructure.Migrations
                     b.ToTable("OrderItems");
                 });
 
+            modelBuilder.Entity("Ghasele.Domain.Entities.PendingRegistration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FullName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsOtpVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Otp")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<DateTime>("OtpExpiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordHash")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PhoneNumber")
+                        .IsUnique();
+
+                    b.ToTable("PendingRegistrations");
+                });
+
             modelBuilder.Entity("Ghasele.Domain.Entities.SupportTicket", b =>
                 {
                     b.Property<int>("Id")
@@ -422,6 +584,9 @@ namespace Ghasele.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AttachmentUrl")
+                        .HasColumnType("text");
 
                     b.Property<string>("Category")
                         .IsRequired()
@@ -486,6 +651,9 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<double?>("StartLocationLng")
                         .HasColumnType("double precision");
 
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -535,17 +703,15 @@ namespace Ghasele.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("RegistrationOtp")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RegistrationOtpExpiry")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("ResetPasswordOtp")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("ResetPasswordOtpExpiry")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -586,6 +752,16 @@ namespace Ghasele.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserLocations");
+                });
+
+            modelBuilder.Entity("Ghasele.Domain.Entities.Driver", b =>
+                {
+                    b.HasOne("Ghasele.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Ghasele.Domain.Entities.Notification", b =>

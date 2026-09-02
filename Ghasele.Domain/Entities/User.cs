@@ -12,6 +12,7 @@ namespace Ghasele.Domain.Entities
         public string PhoneNumber { get; set; } = string.Empty;
         public string? FcmToken { get; set; }
         public bool IsDeleted { get; set; } = false;
+        public UserRole Role { get; set; } = UserRole.Client;
 
         // Stable, per-app Apple user identifier (the "sub" claim from Apple's identity token).
         public string? AppleUserId { get; set; }
@@ -20,7 +21,5 @@ namespace Ghasele.Domain.Entities
         public DateTime? ResetPasswordOtpExpiry { get; set; }
 
         public bool IsPhoneVerified { get; set; } = false;
-        public string? RegistrationOtp { get; set; }
-        public DateTime? RegistrationOtpExpiry { get; set; }
     }
 }

@@ -20,8 +20,14 @@ namespace Ghasele.API.Controllers
             _service = service;
         }
 
+        /// <summary>
+        /// Opens a ticket. Accepts multipart/form-data so the customer app can attach
+        /// a single photo; a plain form with no file works too.
+        /// </summary>
         [HttpPost]
-        public async Task<ActionResult<TicketDto>> CreateTicket([FromBody] CreateTicketDto dto)
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(6 * 1024 * 1024)]
+        public async Task<ActionResult<TicketDto>> CreateTicket([FromForm] CreateTicketDto dto, IFormFile? attachment)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? dto.UserId;
             if (string.IsNullOrEmpty(userId))
@@ -29,7 +35,19 @@ namespace Ghasele.API.Controllers
                 return Unauthorized("User ID not found");
             }
 
-            var ticket = await _service.CreateTicketAsync(userId, dto);
+            TicketAttachmentUpload? upload = null;
+            if (attachment != null && attachment.Length > 0)
+            {
+                upload = new TicketAttachmentUpload
+                {
+                    Content = attachment.OpenReadStream(),
+                    FileName = attachment.FileName,
+                    ContentType = attachment.ContentType,
+                    Length = attachment.Length
+                };
+            }
+
+            var ticket = await _service.CreateTicketAsync(userId, dto, upload);
             return Ok(ticket);
         }
 

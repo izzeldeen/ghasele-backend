@@ -48,6 +48,7 @@ namespace Ghasele.Application.DTOs
         public string? DriverName { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? RouteJson { get; set; }
+        public DateTime? StartedAt { get; set; }
         public double? StartLocationLat { get; set; }
         public double? StartLocationLng { get; set; }
         public double? CleanerLat { get; set; }

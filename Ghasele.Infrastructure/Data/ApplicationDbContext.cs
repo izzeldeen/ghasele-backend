@@ -22,6 +22,9 @@ namespace Ghasele.Infrastructure.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<MarketingCode> MarketingCodes { get; set; }
+        public DbSet<PendingRegistration> PendingRegistrations { get; set; }
+        public DbSet<AppSettings> AppSettings { get; set; }
+        public DbSet<DeliveryWindow> DeliveryWindows { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -47,6 +50,7 @@ namespace Ghasele.Infrastructure.Data
                 entity.Property(e => e.PasswordHash).IsRequired();
                 entity.Property(e => e.FullName).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.FcmToken).HasMaxLength(500);
+                entity.Property(e => e.Role).HasConversion<string>();
             });
 
             modelBuilder.Entity<Order>(entity =>
@@ -59,7 +63,8 @@ namespace Ghasele.Infrastructure.Data
                 entity.Property(e => e.DeliveryAmount).HasPrecision(18, 2);
                 entity.Property(e => e.CleanerAmount).HasPrecision(18, 2);
                 entity.Property(e => e.Status).HasConversion<string>();
-                
+                entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(20);
+
                 entity.HasOne(o => o.User)
                       .WithMany()
                       .HasForeignKey(o => o.UserId)
@@ -91,7 +96,8 @@ namespace Ghasele.Infrastructure.Data
             modelBuilder.Entity<Cleaner>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.NameAr).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.NameEn).IsRequired().HasMaxLength(100);
             });
 
             modelBuilder.Entity<OrderItem>(entity =>
@@ -109,7 +115,8 @@ namespace Ghasele.Infrastructure.Data
             modelBuilder.Entity<ItemType>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.TypeName).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.TypeNameAr).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.TypeNameEn).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.IronPrice).HasPrecision(18, 2);
                 entity.Property(e => e.IronCost).HasPrecision(18, 2);
                 entity.Property(e => e.CleaningPrice).HasPrecision(18, 2);
@@ -121,7 +128,8 @@ namespace Ghasele.Infrastructure.Data
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-111111111111"),
-                        TypeName = "قميص",
+                        TypeNameAr = "قميص",
+                        TypeNameEn = "Shirt",
                         IronPrice = 0.50m,
                         IronCost = 0.20m,
                         CleaningPrice = 0.75m,
@@ -133,7 +141,8 @@ namespace Ghasele.Infrastructure.Data
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-222222222222"),
-                        TypeName = "بنطلون",
+                        TypeNameAr = "بنطلون",
+                        TypeNameEn = "Trousers",
                         IronPrice = 0.75m,
                         IronCost = 0.30m,
                         CleaningPrice = 1.00m,
@@ -145,7 +154,8 @@ namespace Ghasele.Infrastructure.Data
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-333333333333"),
-                        TypeName = "بدلة رجالية",
+                        TypeNameAr = "بدلة رجالية",
+                        TypeNameEn = "Men's Suit",
                         IronPrice = 2.50m,
                         IronCost = 1.00m,
                         CleaningPrice = 3.50m,
@@ -157,7 +167,8 @@ namespace Ghasele.Infrastructure.Data
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-444444444444"),
-                        TypeName = "فستان سهرة",
+                        TypeNameAr = "فستان سهرة",
+                        TypeNameEn = "Evening Dress",
                         IronPrice = 4.00m,
                         IronCost = 1.50m,
                         CleaningPrice = 8.00m,
@@ -169,7 +180,8 @@ namespace Ghasele.Infrastructure.Data
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-555555555555"),
-                        TypeName = "جاكيت",
+                        TypeNameAr = "جاكيت",
+                        TypeNameEn = "Jacket",
                         IronPrice = 1.50m,
                         IronCost = 0.60m,
                         CleaningPrice = 2.00m,
@@ -181,7 +193,8 @@ namespace Ghasele.Infrastructure.Data
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-666666666666"),
-                        TypeName = "لحاف/بطانية كبير",
+                        TypeNameAr = "لحاف/بطانية كبير",
+                        TypeNameEn = "Large Blanket",
                         IronPrice = 0.00m,
                         IronCost = 0.00m,
                         CleaningPrice = 6.00m,
@@ -193,7 +206,8 @@ namespace Ghasele.Infrastructure.Data
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-777777777777"),
-                        TypeName = "ثوب/دشداشة",
+                        TypeNameAr = "ثوب/دشداشة",
+                        TypeNameEn = "Thobe",
                         IronPrice = 1.00m,
                         IronCost = 0.40m,
                         CleaningPrice = 1.25m,
@@ -217,8 +231,14 @@ namespace Ghasele.Infrastructure.Data
             modelBuilder.Entity<Driver>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.NameAr).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.NameEn).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.PhoneNumber).IsRequired().HasMaxLength(20);
+
+                entity.HasOne(d => d.User)
+                      .WithMany()
+                      .HasForeignKey(d => d.UserId)
+                      .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<MarketingCode>(entity =>
@@ -231,6 +251,37 @@ namespace Ghasele.Infrastructure.Data
                 entity.Property(e => e.MarketerName).IsRequired().HasMaxLength(100);
             });
 
+            modelBuilder.Entity<PendingRegistration>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.PhoneNumber).IsRequired().HasMaxLength(20);
+                entity.HasIndex(e => e.PhoneNumber).IsUnique();
+                // Password/name are only supplied by the final step, so both are nullable
+                // while the signup is still at the phone/OTP stage.
+                entity.Property(e => e.PasswordHash);
+                entity.Property(e => e.FullName).HasMaxLength(100);
+                entity.Property(e => e.Otp).IsRequired().HasMaxLength(6);
+            });
+
+            modelBuilder.Entity<AppSettings>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.NormalDeliveryPrice).HasPrecision(18, 2);
+                entity.Property(e => e.ExpressDeliveryPrice).HasPrecision(18, 2);
+
+                // Both seeded at the 1.00 that used to be hardcoded in OrderService, so
+                // deploying this changes no prices until an admin edits them.
+                // Fully qualified: the DbSet property above is also called AppSettings and
+                // would otherwise win name resolution here.
+                entity.HasData(new AppSettings
+                {
+                    Id = Ghasele.Domain.Entities.AppSettings.SingletonId,
+                    NormalDeliveryPrice = 1.00m,
+                    ExpressDeliveryPrice = 1.00m,
+                    UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                });
+            });
+
             modelBuilder.Entity<Order>(entity =>
             {
                 entity.HasOne(o => o.MarketingCode)
@@ -240,6 +291,36 @@ namespace Ghasele.Infrastructure.Data
 
                 entity.Property(e => e.MarketingDiscount).HasPrecision(18, 2);
                 entity.Property(e => e.MarketerShare).HasPrecision(18, 2);
+            });
+
+            modelBuilder.Entity<DeliveryWindow>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Capacity).HasDefaultValue(20);
+                entity.HasIndex(e => e.StartTime);
+
+                // The three windows the operator asked for out of the box; fully editable
+                // from the dashboard afterwards.
+                var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                entity.HasData(
+                    new DeliveryWindow
+                    {
+                        Id = Guid.Parse("d0000001-0000-4000-8000-000000000001"),
+                        StartTime = new TimeOnly(13, 0), EndTime = new TimeOnly(14, 0),
+                        Capacity = 20, IsActive = true, CreatedAt = seedDate
+                    },
+                    new DeliveryWindow
+                    {
+                        Id = Guid.Parse("d0000001-0000-4000-8000-000000000002"),
+                        StartTime = new TimeOnly(15, 0), EndTime = new TimeOnly(16, 0),
+                        Capacity = 20, IsActive = true, CreatedAt = seedDate
+                    },
+                    new DeliveryWindow
+                    {
+                        Id = Guid.Parse("d0000001-0000-4000-8000-000000000003"),
+                        StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(20, 0),
+                        Capacity = 20, IsActive = true, CreatedAt = seedDate
+                    });
             });
         }
     }

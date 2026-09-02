@@ -11,13 +11,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ghasele.Infrastructure", "G
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ghasele.API", "Ghasele.API\Ghasele.API.csproj", "{0906806D-6D64-4026-995C-105C193981C6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{586C6623-BFB1-44A0-AA55-82F39A1A32AA}"
+	ProjectSection(SolutionItems) = preProject
+		deployment command.text = deployment command.text
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D13C2E67-66B6-42F8-8626-37078801340A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -36,5 +38,8 @@ Global
 		{0906806D-6D64-4026-995C-105C193981C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0906806D-6D64-4026-995C-105C193981C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0906806D-6D64-4026-995C-105C193981C6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal

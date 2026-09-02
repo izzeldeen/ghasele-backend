@@ -24,15 +24,29 @@ namespace Ghasele.Application.Localization
         public const string OtpInvalidOrExpired = "auth.otp_invalid_or_expired";
         public const string PhoneVerified = "auth.phone_verified";
         public const string OtpSent = "auth.otp_sent";
+        public const string RegistrationNotFound = "auth.registration_not_found";
+        public const string RegistrationOtpNotVerified = "auth.registration_otp_not_verified";
         public const string OtpVerified = "auth.otp_verified";
         public const string PasswordReset = "auth.password_reset";
         public const string FcmTokenUpdated = "auth.fcm_token_updated";
+
+        /// <summary>Takes the OTP code as <c>{0}</c>.</summary>
+        public const string WhatsAppRegistrationOtpMessage = "auth.whatsapp_registration_otp_message";
+
+        /// <summary>Takes the upstream WhatsApp Cloud API error message as <c>{0}</c>.</summary>
+        public const string WhatsAppSendFailed = "auth.whatsapp_send_failed";
+
+        // Firebase Phone Authentication (client-side SMS; separate from the WhatsApp OTP flow).
+        public const string FirebaseTokenMissing = "auth.firebase_token_missing";
+        public const string FirebaseTokenInvalid = "auth.firebase_token_invalid";
 
         // Orders
         public const string OrderNotFound = "order.not_found";
         public const string OrderPendingExists = "order.pending_exists";
         public const string OrderNotPartOfTrip = "order.not_part_of_trip";
         public const string OrderDeleted = "order.deleted";
+        public const string OrderItemNotFound = "orderitem.not_found";
+        public const string OrderItemDeleted = "orderitem.deleted";
 
         // Trips
         public const string TripNotFound = "trip.not_found";
@@ -40,6 +54,8 @@ namespace Ghasele.Application.Localization
         public const string TripOrdersRequired = "trip.orders_required";
         public const string TripOrdersOutOfSequence = "trip.orders_out_of_sequence";
         public const string TripMustBeCollected = "trip.must_be_collected";
+        public const string TripNotAssignedToCaller = "trip.not_assigned_to_caller";
+        public const string TripDeleted = "trip.deleted";
 
         /// <summary>Takes the order reference number as <c>{0}</c>.</summary>
         public const string TripOrderAlreadyAssigned = "trip.order_already_assigned";
@@ -62,6 +78,18 @@ namespace Ghasele.Application.Localization
 
         // User locations
         public const string LocationDeleted = "location.deleted";
+
+        // Settings
+        public const string DeliveryPriceNegative = "settings.delivery_price_negative";
+
+        // Delivery windows (scheduled trips)
+        public const string DeliveryWindowNotFound = "delivery_window.not_found";
+        public const string DeliveryWindowInvalidRange = "delivery_window.invalid_range";
+        public const string DeliveryWindowInvalidCapacity = "delivery_window.invalid_capacity";
+
+        // Support tickets
+        public const string TicketAttachmentTooLarge = "ticket.attachment_too_large";
+        public const string TicketAttachmentInvalidType = "ticket.attachment_invalid_type";
 
         // Maintenance
         public const string PurgeComplete = "maintenance.purge_complete";

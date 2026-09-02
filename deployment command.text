@@ -1,0 +1,24 @@
+
+//Set the backup
+ssh root@65.109.146.40 "rm -rf /var/www/ghasele-api-backup && mv /var/www/ghasele-api /var/www/ghasele-api-backup && mkdir -p /var/www/ghasele-api"
+
+// Deploy from local device to server
+scp -r D:\Ghaselak\ghasele-backend\Ghasele.API\bin\Release\net9.0\publish\* root@65.109.146.40:/var/www/ghasele-api/
+
+//Restart the service
+ssh root@65.109.146.40 "systemctl restart ghasele-api.service"
+
+//Rollback 
+ssh root@65.109.146.40 "rm -rf /var/www/ghasele-api && mv /var/www/ghasele-api-backup /var/www/ghasele-api && systemctl restart ghasele-api.service"
+
+
+
+//Frontend 
+//Set the backup
+ssh root@65.109.146.40 "rm -rf /var/www/ghasele-admin-backup && mv /var/www/ghasele-admin /var/www/ghasele-admin-backup && mkdir -p /var/www/ghasele-admin"
+
+//Deploy 
+scp -r D:\Ghaselak\ghasele-frontend\admin\dist\admin\browser\* root@65.109.146.40:/var/www/ghasele-admin/
+
+//Rollback
+ssh root@65.109.146.40 "rm -rf /var/www/ghasele-admin && mv /var/www/ghasele-admin-backup /var/www/ghasele-admin"

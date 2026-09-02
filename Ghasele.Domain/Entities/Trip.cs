@@ -19,7 +19,14 @@ namespace Ghasele.Domain.Entities
 
         public double? StartLocationLat { get; set; }
         public double? StartLocationLng { get; set; }
-        
+
+        /// <summary>
+        /// Set the moment the captain taps "Start trip" in the driver app. Null means the trip
+        /// is assigned but the captain has not left yet. Starting also (re)computes RouteJson
+        /// from the captain's position if it is empty.
+        /// </summary>
+        public DateTime? StartedAt { get; set; }
+
         // Navigation collection
         public ICollection<Order> Orders { get; set; } = new List<Order>();
     }

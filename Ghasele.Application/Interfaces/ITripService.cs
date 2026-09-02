@@ -19,5 +19,9 @@ namespace Ghasele.Application.Interfaces
         Task<TripDto> DeliverOrderAsync(Guid orderId);
         Task<List<TripDto>> GetAllTripsAsync();
         Task<TripDto?> GetTripByIdAsync(Guid id);
+        Task<List<TripDto>> GetTripsForDriverAsync(Guid driverId);
+        Task<TripDto> StartTripAsync(Guid tripId, double? startLat, double? startLng);
+        Task<TripDto?> GetTripByOrderIdAsync(Guid orderId);
+        Task DeleteTripAsync(Guid id);
     }
 }

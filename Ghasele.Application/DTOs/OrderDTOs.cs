@@ -12,6 +12,9 @@ namespace Ghasele.Application.DTOs
         public decimal DeliveryAmount { get; set; }
         public decimal CleanerAmount { get; set; }
         public string? MarketingCode { get; set; }
+
+        /// <summary>"Normal" or "Express". Anything else (or absent) falls back to Normal.</summary>
+        public string? Type { get; set; }
     }
 
     public class UpdateOrderDto
@@ -38,10 +41,14 @@ namespace Ghasele.Application.DTOs
         public decimal CleanerAmount { get; set; }
         public string ReferenceNumber { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public Guid? TripId { get; set; }
         public string? TripReferenceNumber { get; set; }
+        public Guid? CleanerId { get; set; }
         public string? CleanerName { get; set; }
+        public double? CleanerLat { get; set; }
+        public double? CleanerLng { get; set; }
         public string? DriverName { get; set; }
         public string? DriverPhoneNumber { get; set; }
         public string? MarketingCode { get; set; }

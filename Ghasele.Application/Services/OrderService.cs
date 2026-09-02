@@ -17,21 +17,38 @@ namespace Ghasele.Application.Services
         private readonly IItemTypeRepository _itemTypeRepository;
         private readonly IMarketingCodeRepository _marketingCodeRepository;
         private readonly ITripRepository _tripRepository;
+        private readonly IAppSettingsRepository _appSettingsRepository;
+        private readonly ICurrentLanguageProvider _language;
 
-        public OrderService(IOrderRepository orderRepository, IItemTypeRepository itemTypeRepository, IMarketingCodeRepository marketingCodeRepository, ITripRepository tripRepository)
+        public OrderService(IOrderRepository orderRepository, IItemTypeRepository itemTypeRepository, IMarketingCodeRepository marketingCodeRepository, ITripRepository tripRepository, IAppSettingsRepository appSettingsRepository, ICurrentLanguageProvider language)
         {
             _orderRepository = orderRepository;
             _itemTypeRepository = itemTypeRepository;
             _marketingCodeRepository = marketingCodeRepository;
             _tripRepository = tripRepository;
+            _appSettingsRepository = appSettingsRepository;
+            _language = language;
         }
 
         public async Task<OrderDto> CreateOrderAsync(CreateOrderDto dto)
         {
-            if (await _orderRepository.HasPendingOrderAsync(dto.UserId))
+            // Customers may now place a new order while an earlier one is still being
+            // processed. The old one-open-order-at-a-time rule was removed by product;
+            // HasPendingOrderAsync is still exposed on the repository for reporting.
+
+            var orderType = OrderType.Normal;
+            if (!string.IsNullOrEmpty(dto.Type) && Enum.TryParse<OrderType>(dto.Type, true, out var parsedType))
             {
-                throw new AppException(ErrorCodes.OrderPendingExists);
+                orderType = parsedType;
             }
+
+            // Stamp the fee at order time from the admin-managed settings, so a price change
+            // between ordering and collection cannot charge the customer more than they were
+            // quoted. The client's DeliveryAmount is ignored - it is not authoritative.
+            var settings = await _appSettingsRepository.GetAsync();
+            var deliveryAmount = orderType == OrderType.Express
+                ? settings.ExpressDeliveryPrice
+                : settings.NormalDeliveryPrice;
 
             var order = new Order
             {
@@ -40,10 +57,11 @@ namespace Ghasele.Application.Services
                 UserId = dto.UserId,
                 TotalAmount = dto.TotalAmount,
                 NetAmount = dto.NetAmount,
-                DeliveryAmount = dto.DeliveryAmount,
+                DeliveryAmount = deliveryAmount,
                 CleanerAmount = dto.CleanerAmount,
                 ReferenceNumber = $"GH-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N").Substring(0, 4).ToUpper()}",
                 Status = OrderStatus.PendingCollection,
+                Type = orderType,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -58,13 +76,14 @@ namespace Ghasele.Application.Services
 
             await _orderRepository.AddAsync(order);
 
-            return MapToDto(order);
+            return MapToDto(order, _language.Language);
         }
 
-        public async Task<List<OrderDto>> GetUserOrdersAsync(Guid userId)
+        public async Task<List<OrderDto>> GetUserOrdersAsync(Guid userId, int page = 1, int pageSize = 20)
         {
-            var orders = await _orderRepository.GetByUserIdAsync(userId);
-            return orders.Select(MapToDto).ToList();
+            var orders = await _orderRepository.GetByUserIdAsync(userId, page, pageSize);
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            return orders.Select(o => MapToDto(o, _language.Language, itemTypes)).ToList();
         }
 
         public async Task<List<OrderDto>> GetAllOrdersAsync(string? status = null, string? searchTerm = null)
@@ -76,13 +95,16 @@ namespace Ghasele.Application.Services
             }
 
             var orders = await _orderRepository.GetAllAsync(orderStatus, searchTerm);
-            return orders.Select(MapToDto).ToList();
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            return orders.Select(o => MapToDto(o, _language.Language, itemTypes)).ToList();
         }
 
         public async Task<OrderDto?> GetOrderByIdAsync(Guid id)
         {
             var order = await _orderRepository.GetByIdAsync(id);
-            return order != null ? MapToDto(order) : null;
+            if (order == null) return null;
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            return MapToDto(order, _language.Language, itemTypes);
         }
 
         public async Task<OrderDto> AddItemsToOrderAsync(Guid orderId, AddOrderItemsDto dto)
@@ -118,8 +140,11 @@ namespace Ghasele.Application.Services
                 };
                 orderItems.Add(orderItem);
 
-                // Find price
-                var itemType = allItemTypes.FirstOrDefault(t => t.TypeName.Equals(itemDto.ItemType, StringComparison.OrdinalIgnoreCase));
+                // Find price. The driver types this in free text on whatever language their
+                // device is in, so it can arrive in either name.
+                var itemType = allItemTypes.FirstOrDefault(t =>
+                    t.TypeNameEn.Equals(itemDto.ItemType, StringComparison.OrdinalIgnoreCase) ||
+                    t.TypeNameAr.Equals(itemDto.ItemType, StringComparison.OrdinalIgnoreCase));
                 if (itemType != null)
                 {
                     decimal price = 0;
@@ -154,8 +179,9 @@ namespace Ghasele.Application.Services
             // But we modified `order.Items` by adding previously? No, I stopped adding to `order.Items` directly above.
             // So `order` is unmodified and its Items collection might not know about new items yet, which is fine for calculation.
 
-            // Update amounts
-            order.DeliveryAmount = 1.0m; // Fixed delivery amount
+            // DeliveryAmount is deliberately left alone: it was stamped at order time from
+            // the settings that applied to this order's type (see CreateOrderAsync). Re-reading
+            // it here would silently re-price the order if an admin changed the fee meanwhile.
             order.CleanerAmount = costTotal;
 
             // Apply marketing discount if applicable
@@ -197,7 +223,7 @@ namespace Ghasele.Application.Services
 
             // Reload with all includes for the DTO
             var updatedOrder = await _orderRepository.GetByIdAsync(orderId);
-            return MapToDto(updatedOrder!);
+            return MapToDto(updatedOrder!, _language.Language, allItemTypes);
         }
 
         public async Task<OrderDto> UpdateOrderAsync(Guid id, UpdateOrderDto dto)
@@ -214,7 +240,27 @@ namespace Ghasele.Application.Services
             }
 
             await _orderRepository.UpdateAsync(order);
-            return MapToDto(order);
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            return MapToDto(order, _language.Language, itemTypes);
+        }
+
+        public async Task<OrderDto> DeleteOrderItemAsync(Guid orderId, Guid itemId)
+        {
+            var item = await _orderRepository.GetItemByIdAsync(itemId);
+            if (item == null || item.OrderId != orderId)
+            {
+                throw AppException.NotFound(ErrorCodes.OrderItemNotFound);
+            }
+
+            await _orderRepository.DeleteItemAsync(item);
+
+            var order = await _orderRepository.GetByIdForUpdateAsync(orderId);
+            if (order == null)
+            {
+                throw AppException.NotFound(ErrorCodes.OrderNotFound);
+            }
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            return MapToDto(order, _language.Language, itemTypes);
         }
 
         public async Task DeleteOrderAsync(Guid id)
@@ -222,10 +268,10 @@ namespace Ghasele.Application.Services
             await _orderRepository.DeleteAsync(id);
         }
 
-        public static OrderDto MapToDto(Order order)
+        public static OrderDto MapToDto(Order order, string language, IEnumerable<ItemType>? itemTypes = null)
         {
             if (order == null) return new OrderDto();
-            
+
             return new OrderDto
             {
                 Id = order.Id,
@@ -241,11 +287,21 @@ namespace Ghasele.Application.Services
                 CleanerAmount = order.CleanerAmount,
                 ReferenceNumber = order.ReferenceNumber,
                 Status = order.Status.ToString(),
+                Type = order.Type.ToString(),
                 CreatedAt = order.CreatedAt,
                 TripId = order.TripId,
                 TripReferenceNumber = order.Trip?.ReferenceNumber,
-                CleanerName = order.Trip?.Cleaner?.Name,
-                DriverName = order.Trip?.Driver?.Name,
+                CleanerId = order.Trip?.CleanerId,
+                CleanerName = order.Trip?.Cleaner != null
+                    ? BilingualText.Pick(order.Trip.Cleaner.NameAr, order.Trip.Cleaner.NameEn, language)
+                    : null,
+                // Carried on the order so delivery rounds can route from the
+                // cleaner without a second call to fetch its coordinates.
+                CleanerLat = order.Trip?.Cleaner?.Latitude,
+                CleanerLng = order.Trip?.Cleaner?.Longitude,
+                DriverName = order.Trip?.Driver != null
+                    ? BilingualText.Pick(order.Trip.Driver.NameAr, order.Trip.Driver.NameEn, language)
+                    : null,
                 DriverPhoneNumber = order.Trip?.Driver?.PhoneNumber,
                 MarketingCode = order.MarketingCode?.Code,
                 MarketingDiscount = order.MarketingDiscount,
@@ -255,11 +311,26 @@ namespace Ghasele.Application.Services
                 Items = order.Items?.Select(i => new OrderItemDto
                 {
                     Id = i.Id,
-                    ItemType = i.ItemType,
+                    ItemType = ResolveItemTypeName(i.ItemType, itemTypes, language),
                     ServiceType = i.ServiceType.ToString(),
                     Quantity = i.Quantity
                 }).ToList() ?? new List<OrderItemDto>()
             };
+        }
+
+        /// <summary>
+        /// OrderItem stores whatever name the client's device language sent at collection
+        /// time (see AddItemsToOrderAsync), not an ItemTypeId. To display it correctly
+        /// regardless of the *viewer's* language, match it back to its ItemType by either
+        /// name and re-pick the name for the current language. Falls back to the stored
+        /// text if no match is found (e.g. the item type was later renamed or deleted).
+        /// </summary>
+        private static string ResolveItemTypeName(string stored, IEnumerable<ItemType>? itemTypes, string language)
+        {
+            var match = itemTypes?.FirstOrDefault(t =>
+                t.TypeNameEn.Equals(stored, StringComparison.OrdinalIgnoreCase) ||
+                t.TypeNameAr.Equals(stored, StringComparison.OrdinalIgnoreCase));
+            return match != null ? BilingualText.Pick(match.TypeNameAr, match.TypeNameEn, language) : stored;
         }
     }
 }

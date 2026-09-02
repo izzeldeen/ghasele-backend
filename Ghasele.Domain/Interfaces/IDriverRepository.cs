@@ -10,6 +10,7 @@ namespace Ghasele.Domain.Interfaces
         Task<Driver> AddAsync(Driver driver);
         Task<List<Driver>> GetAllAsync();
         Task<Driver?> GetByIdAsync(Guid id);
+        Task<Driver?> GetByUserIdAsync(Guid userId);
         Task UpdateAsync(Driver driver);
         Task DeleteAsync(Guid id);
     }

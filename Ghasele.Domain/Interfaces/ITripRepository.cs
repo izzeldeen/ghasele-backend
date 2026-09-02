@@ -10,6 +10,8 @@ namespace Ghasele.Domain.Interfaces
         Task<Trip> AddAsync(Trip trip);
         Task<Trip?> GetByIdAsync(Guid id);
         Task<List<Trip>> GetAllAsync();
+        Task<List<Trip>> GetByDriverIdAsync(Guid driverId);
         Task UpdateAsync(Trip trip);
+        Task DeleteAsync(Guid id);
     }
 }

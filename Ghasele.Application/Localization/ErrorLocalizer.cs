@@ -29,20 +29,31 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.OtpInvalidOrExpired] = "Invalid or expired verification code.",
             [ErrorCodes.PhoneVerified] = "Phone number verified successfully.",
             [ErrorCodes.OtpSent] = "Verification code sent via WhatsApp successfully.",
+            [ErrorCodes.RegistrationNotFound] = "No pending registration was found for this phone number. Please sign up again.",
+            [ErrorCodes.RegistrationOtpNotVerified] = "Please verify your phone number before completing registration.",
             [ErrorCodes.OtpVerified] = "Verification code confirmed successfully.",
             [ErrorCodes.PasswordReset] = "Password reset successfully.",
             [ErrorCodes.FcmTokenUpdated] = "Token updated successfully.",
+            [ErrorCodes.WhatsAppRegistrationOtpMessage] = "Your Ghasele verification code is: {0}. This code expires in 10 minutes.",
+            [ErrorCodes.WhatsAppSendFailed] = "Failed to send WhatsApp message: {0}",
+
+            [ErrorCodes.FirebaseTokenMissing] = "Missing Firebase token.",
+            [ErrorCodes.FirebaseTokenInvalid] = "Phone verification could not be confirmed. Please try again.",
 
             [ErrorCodes.OrderNotFound] = "Order not found.",
             [ErrorCodes.OrderPendingExists] = "You already have a pending order. Please wait for it to be processed.",
             [ErrorCodes.OrderNotPartOfTrip] = "This order is not part of a trip.",
             [ErrorCodes.OrderDeleted] = "Order deleted successfully.",
+            [ErrorCodes.OrderItemNotFound] = "Order item not found.",
+            [ErrorCodes.OrderItemDeleted] = "Order item deleted successfully.",
 
             [ErrorCodes.TripNotFound] = "Trip not found.",
             [ErrorCodes.TripCleanerAndDriverRequired] = "A laundry and a driver must be selected to create a trip.",
             [ErrorCodes.TripOrdersRequired] = "At least one order must be selected to create a trip.",
             [ErrorCodes.TripOrdersOutOfSequence] = "Orders must be collected one by one in sequence.",
             [ErrorCodes.TripMustBeCollected] = "The trip must be in Collected status before delivering to the laundry.",
+            [ErrorCodes.TripDeleted] = "Trip deleted successfully.",
+            [ErrorCodes.TripNotAssignedToCaller] = "This trip is not assigned to you.",
             [ErrorCodes.TripOrderAlreadyAssigned] = "Order {0} is already assigned to another trip.",
 
             [ErrorCodes.CleanerNotFound] = "Laundry not found.",
@@ -58,6 +69,14 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.MarketingCodeDeleted] = "Marketing code deleted successfully.",
 
             [ErrorCodes.LocationDeleted] = "Location deleted successfully.",
+
+            [ErrorCodes.DeliveryPriceNegative] = "Delivery prices cannot be negative.",
+            [ErrorCodes.DeliveryWindowNotFound] = "Delivery window not found.",
+            [ErrorCodes.DeliveryWindowInvalidRange] = "The end time must be after the start time.",
+            [ErrorCodes.DeliveryWindowInvalidCapacity] = "Capacity must be at least 1.",
+
+            [ErrorCodes.TicketAttachmentTooLarge] = "The photo is too large. Please attach an image under 5 MB.",
+            [ErrorCodes.TicketAttachmentInvalidType] = "Only image files can be attached.",
 
             [ErrorCodes.PurgeComplete] = "Purge complete.",
             [ErrorCodes.PurgeFailed] = "Purge failed and was rolled back.",
@@ -80,20 +99,31 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.OtpInvalidOrExpired] = "رمز التحقق غير صحيح أو منتهي الصلاحية.",
             [ErrorCodes.PhoneVerified] = "تم توثيق رقم الهاتف بنجاح.",
             [ErrorCodes.OtpSent] = "تم إرسال رمز التحقق عبر واتساب بنجاح.",
+            [ErrorCodes.RegistrationNotFound] = "لم يتم العثور على تسجيل قيد الانتظار بهذا الرقم. يرجى التسجيل مرة أخرى.",
+            [ErrorCodes.RegistrationOtpNotVerified] = "يرجى التحقق من رقم هاتفك قبل إكمال التسجيل.",
             [ErrorCodes.OtpVerified] = "تم التحقق من الرمز بنجاح.",
             [ErrorCodes.PasswordReset] = "تم إعادة تعيين كلمة المرور بنجاح.",
             [ErrorCodes.FcmTokenUpdated] = "تم تحديث الرمز بنجاح.",
+            [ErrorCodes.WhatsAppRegistrationOtpMessage] = "رمز التحقق الخاص بك في Ghasele هو: {0}. تنتهي صلاحيته خلال 10 دقائق.",
+            [ErrorCodes.WhatsAppSendFailed] = "فشل إرسال رسالة واتساب: {0}",
+
+            [ErrorCodes.FirebaseTokenMissing] = "رمز Firebase مفقود.",
+            [ErrorCodes.FirebaseTokenInvalid] = "تعذّر تأكيد التحقق من رقم الهاتف. يرجى المحاولة مرة أخرى.",
 
             [ErrorCodes.OrderNotFound] = "لم يتم العثور على الطلب.",
             [ErrorCodes.OrderPendingExists] = "لديك طلب قيد الانتظار بالفعل. يرجى انتظار معالجته.",
             [ErrorCodes.OrderNotPartOfTrip] = "هذا الطلب غير مرتبط بأي رحلة.",
             [ErrorCodes.OrderDeleted] = "تم حذف الطلب بنجاح.",
+            [ErrorCodes.OrderItemNotFound] = "لم يتم العثور على عنصر الطلب.",
+            [ErrorCodes.OrderItemDeleted] = "تم حذف عنصر الطلب بنجاح.",
 
             [ErrorCodes.TripNotFound] = "لم يتم العثور على الرحلة.",
             [ErrorCodes.TripCleanerAndDriverRequired] = "يجب اختيار المغسلة والسائق لإنشاء الرحلة.",
             [ErrorCodes.TripOrdersRequired] = "يجب اختيار طلب واحد على الأقل لإنشاء الرحلة.",
             [ErrorCodes.TripOrdersOutOfSequence] = "يجب استلام الطلبات واحداً تلو الآخر بالترتيب.",
             [ErrorCodes.TripMustBeCollected] = "يجب أن تكون الرحلة في حالة \"تم الاستلام\" قبل التسليم إلى المغسلة.",
+            [ErrorCodes.TripDeleted] = "تم حذف الرحلة بنجاح.",
+            [ErrorCodes.TripNotAssignedToCaller] = "هذه الرحلة غير مُسندة إليك.",
             [ErrorCodes.TripOrderAlreadyAssigned] = "الطلب {0} مُسند إلى رحلة أخرى بالفعل.",
 
             [ErrorCodes.CleanerNotFound] = "لم يتم العثور على المغسلة.",
@@ -109,6 +139,14 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.MarketingCodeDeleted] = "تم حذف الرمز التسويقي بنجاح.",
 
             [ErrorCodes.LocationDeleted] = "تم حذف الموقع بنجاح.",
+
+            [ErrorCodes.DeliveryPriceNegative] = "لا يمكن أن تكون أسعار التوصيل بالسالب.",
+            [ErrorCodes.DeliveryWindowNotFound] = "لم يتم العثور على فترة التوصيل.",
+            [ErrorCodes.DeliveryWindowInvalidRange] = "يجب أن يكون وقت النهاية بعد وقت البداية.",
+            [ErrorCodes.DeliveryWindowInvalidCapacity] = "يجب أن تكون السعة 1 على الأقل.",
+
+            [ErrorCodes.TicketAttachmentTooLarge] = "حجم الصورة كبير جداً. يرجى إرفاق صورة أقل من 5 ميجابايت.",
+            [ErrorCodes.TicketAttachmentInvalidType] = "يمكن إرفاق ملفات الصور فقط.",
 
             [ErrorCodes.PurgeComplete] = "تمت عملية التنظيف بنجاح.",
             [ErrorCodes.PurgeFailed] = "فشلت عملية التنظيف وتم التراجع عنها.",

@@ -21,23 +21,24 @@ namespace Ghasele.API.Controllers
             _authService = authService;
         }
 
-        [HttpPost("signup")]
-        public async Task<IActionResult> SignUp([FromBody] RegisterRequest request)
+        // Step 1: user enters a phone number, we send a WhatsApp OTP.
+        [HttpPost("start-registration")]
+        public async Task<IActionResult> StartRegistration([FromBody] StartRegistrationRequest request)
         {
-            System.Console.WriteLine($"[BACKEND] SignUp Request: Phone={request.PhoneNumber}, Name={request.FullName}");
-            var response = await _authService.RegisterAsync(request);
+            System.Console.WriteLine($"[BACKEND] StartRegistration Request: Phone={request.PhoneNumber}");
+            var response = await _authService.StartRegistrationAsync(request.PhoneNumber);
             return Ok(response);
         }
 
+        // Step 2: user enters the code. On success the phone is marked verified but no account
+        // exists yet - the client moves on to collect a name and password.
         [HttpPost("verify-registration-otp")]
         public async Task<IActionResult> VerifyRegistrationOtp([FromBody] VerifyRegistrationOtpRequest request)
         {
-            var isValid = await _authService.VerifyRegistrationOtpAsync(request.PhoneNumber, request.Otp);
-            if (isValid)
-            {
-                return Ok(new { success = true, message = L(ErrorCodes.PhoneVerified) });
-            }
-            return BadRequest(new { success = false, errorCode = ErrorCodes.OtpInvalidOrExpired, message = L(ErrorCodes.OtpInvalidOrExpired) });
+            // Failures propagate to ExceptionHandlingMiddleware, which localizes them into the
+            // caller's language. Catching here would surface the raw error code instead.
+            var response = await _authService.VerifyRegistrationOtpAsync(request.PhoneNumber, request.Otp);
+            return Ok(new { verified = true, phoneNumber = response.PhoneNumber, message = response.Message });
         }
 
         [HttpPost("resend-registration-otp")]
@@ -47,6 +48,16 @@ namespace Ghasele.API.Controllers
             // caller's language. Catching here would surface the raw error code instead.
             await _authService.ResendRegistrationOtpAsync(request.PhoneNumber);
             return Ok(new { message = L(ErrorCodes.OtpSent) });
+        }
+
+        // Step 3: phone is verified, so create the account from the name + password and return a
+        // token so the client is logged straight in.
+        [HttpPost("complete-registration")]
+        public async Task<IActionResult> CompleteRegistration([FromBody] CompleteRegistrationRequest request)
+        {
+            System.Console.WriteLine($"[BACKEND] CompleteRegistration Request: Phone={request.PhoneNumber}, Name={request.FullName}");
+            var response = await _authService.CompleteRegistrationAsync(request);
+            return Ok(response);
         }
 
         [HttpPost("signin")]

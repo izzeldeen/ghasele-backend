@@ -4,7 +4,8 @@ namespace Ghasele.Application.DTOs
 {
     public class CreateItemTypeDto
     {
-        public string TypeName { get; set; } = string.Empty;
+        public string TypeNameAr { get; set; } = string.Empty;
+        public string TypeNameEn { get; set; } = string.Empty;
         public decimal IronPrice { get; set; }
         public decimal IronCost { get; set; }
         public decimal CleaningPrice { get; set; }
@@ -16,6 +17,9 @@ namespace Ghasele.Application.DTOs
     public class ItemTypeDto
     {
         public Guid Id { get; set; }
+        public string TypeNameAr { get; set; } = string.Empty;
+        public string TypeNameEn { get; set; } = string.Empty;
+        /// <summary>TypeNameAr or TypeNameEn, chosen for the request's language - for callers that just want a name to display.</summary>
         public string TypeName { get; set; } = string.Empty;
         public decimal IronPrice { get; set; }
         public decimal IronCost { get; set; }

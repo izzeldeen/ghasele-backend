@@ -36,11 +36,11 @@ namespace Ghasele.API.Controllers
         }
 
         [HttpGet("user/{userId}")]
-        public async Task<IActionResult> GetUserOrders(Guid userId)
+        public async Task<IActionResult> GetUserOrders(Guid userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             try
             {
-                var orders = await _orderService.GetUserOrdersAsync(userId);
+                var orders = await _orderService.GetUserOrdersAsync(userId, page, pageSize);
                 return Ok(orders);
             }
             catch (Exception ex)
@@ -90,6 +90,19 @@ namespace Ghasele.API.Controllers
             }
         }
 
+        [HttpDelete("{id}/items/{itemId}")]
+        public async Task<IActionResult> DeleteOrderItem(Guid id, Guid itemId)
+        {
+            try
+            {
+                var order = await _orderService.DeleteOrderItemAsync(id, itemId);
+                return Ok(order);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ErrorBody(ex));
+            }
+        }
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateOrder(Guid id, [FromBody] UpdateOrderDto dto)
         {

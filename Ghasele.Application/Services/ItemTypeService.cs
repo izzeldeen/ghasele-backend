@@ -14,17 +14,20 @@ namespace Ghasele.Application.Services
     public class ItemTypeService : IItemTypeService
     {
         private readonly IItemTypeRepository _repository;
+        private readonly ICurrentLanguageProvider _language;
 
-        public ItemTypeService(IItemTypeRepository repository)
+        public ItemTypeService(IItemTypeRepository repository, ICurrentLanguageProvider language)
         {
             _repository = repository;
+            _language = language;
         }
 
         public async Task<ItemTypeDto> CreateItemTypeAsync(CreateItemTypeDto dto)
         {
             var itemType = new ItemType
             {
-                TypeName = dto.TypeName,
+                TypeNameAr = dto.TypeNameAr,
+                TypeNameEn = dto.TypeNameEn,
                 IronPrice = dto.IronPrice,
                 IronCost = dto.IronCost,
                 CleaningPrice = dto.CleaningPrice,
@@ -35,33 +38,13 @@ namespace Ghasele.Application.Services
 
             await _repository.AddAsync(itemType);
 
-            return new ItemTypeDto
-            {
-                Id = itemType.Id,
-                TypeName = itemType.TypeName,
-                IronPrice = itemType.IronPrice,
-                IronCost = itemType.IronCost,
-                CleaningPrice = itemType.CleaningPrice,
-                CleaningCost = itemType.CleaningCost,
-                BothPrice = itemType.BothPrice,
-                BothCost = itemType.BothCost
-            };
+            return MapToDto(itemType);
         }
 
         public async Task<List<ItemTypeDto>> GetAllItemTypesAsync()
         {
             var items = await _repository.GetAllAsync();
-            return items.Select(i => new ItemTypeDto
-            {
-                Id = i.Id,
-                TypeName = i.TypeName,
-                IronPrice = i.IronPrice,
-                IronCost = i.IronCost,
-                CleaningPrice = i.CleaningPrice,
-                CleaningCost = i.CleaningCost,
-                BothPrice = i.BothPrice,
-                BothCost = i.BothCost
-            }).ToList();
+            return items.Select(MapToDto).ToList();
         }
 
         public async Task<ItemTypeDto> UpdateItemTypeAsync(Guid id, CreateItemTypeDto dto)
@@ -69,7 +52,8 @@ namespace Ghasele.Application.Services
             var item = await _repository.GetByIdAsync(id);
             if (item == null) throw AppException.NotFound(ErrorCodes.ItemTypeNotFound);
 
-            item.TypeName = dto.TypeName;
+            item.TypeNameAr = dto.TypeNameAr;
+            item.TypeNameEn = dto.TypeNameEn;
             item.IronPrice = dto.IronPrice;
             item.IronCost = dto.IronCost;
             item.CleaningPrice = dto.CleaningPrice;
@@ -79,10 +63,17 @@ namespace Ghasele.Application.Services
 
             await _repository.UpdateAsync(item);
 
+            return MapToDto(item);
+        }
+
+        private ItemTypeDto MapToDto(ItemType item)
+        {
             return new ItemTypeDto
             {
                 Id = item.Id,
-                TypeName = item.TypeName,
+                TypeNameAr = item.TypeNameAr,
+                TypeNameEn = item.TypeNameEn,
+                TypeName = BilingualText.Pick(item.TypeNameAr, item.TypeNameEn, _language.Language),
                 IronPrice = item.IronPrice,
                 IronCost = item.IronCost,
                 CleaningPrice = item.CleaningPrice,

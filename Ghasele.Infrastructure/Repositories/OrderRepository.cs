@@ -25,13 +25,15 @@ namespace Ghasele.Infrastructure.Repositories
             return order;
         }
 
-        public async Task<List<Order>> GetByUserIdAsync(Guid userId)
+        public async Task<List<Order>> GetByUserIdAsync(Guid userId, int page = 1, int pageSize = 20)
         {
             return await _context.Orders
                 .Include(o => o.Items)
                 .Include(o => o.Trip).ThenInclude(t => t!.Driver)
                 .Where(o => o.UserId == userId)
                 .OrderByDescending(o => o.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
         }
 
@@ -122,6 +124,17 @@ namespace Ghasele.Infrastructure.Repositories
         public async Task AddItemsAsync(IEnumerable<OrderItem> items)
         {
             await _context.Set<OrderItem>().AddRangeAsync(items);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<OrderItem?> GetItemByIdAsync(Guid itemId)
+        {
+            return await _context.Set<OrderItem>().FirstOrDefaultAsync(i => i.Id == itemId);
+        }
+
+        public async Task DeleteItemAsync(OrderItem item)
+        {
+            _context.Set<OrderItem>().Remove(item);
             await _context.SaveChangesAsync();
         }
     }

@@ -26,46 +26,75 @@ namespace Ghasele.Application.Services
         private static readonly HttpClient _httpClient = new HttpClient();
 
         private readonly IUserRepository _userRepository;
+        private readonly IPendingRegistrationRepository _pendingRegistrationRepository;
         private readonly IConfiguration _configuration;
         private readonly IWhatsAppService _whatsAppService;
+        private readonly IFirebaseAuthService _firebaseAuthService;
+        private readonly IErrorLocalizer _errorLocalizer;
+        private readonly ICurrentLanguageProvider _language;
 
-        public AuthService(IUserRepository userRepository, IConfiguration configuration, IWhatsAppService whatsAppService)
+        public AuthService(
+            IUserRepository userRepository,
+            IPendingRegistrationRepository pendingRegistrationRepository,
+            IConfiguration configuration,
+            IWhatsAppService whatsAppService,
+            IFirebaseAuthService firebaseAuthService,
+            IErrorLocalizer errorLocalizer,
+            ICurrentLanguageProvider language)
         {
             _userRepository = userRepository;
+            _pendingRegistrationRepository = pendingRegistrationRepository;
             _configuration = configuration;
             _whatsAppService = whatsAppService;
+            _firebaseAuthService = firebaseAuthService;
+            _errorLocalizer = errorLocalizer;
+            _language = language;
         }
 
-        public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
+        // How long the confirmed OTP stays good for the name/password step before the user has to
+        // request a fresh code.
+        private static readonly TimeSpan CompleteRegistrationWindow = TimeSpan.FromMinutes(30);
+
+        // Step 1: the user gives only a phone number. We stash it in PendingRegistrations with a
+        // fresh OTP - no User, no password, no name yet. An unverified phone number should never
+        // occupy a real account.
+        public async Task<RegisterResponse> StartRegistrationAsync(string phoneNumber)
         {
-            var existingPhone = await _userRepository.GetByPhoneNumberAsync(request.PhoneNumber);
-            if (existingPhone != null)
+            var existingUser = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
+            if (existingUser != null)
             {
                 throw new AppException(ErrorCodes.PhoneAlreadyExists, 409);
             }
 
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
-
             var otp = GenerateOtp();
+            var otpExpiry = DateTime.UtcNow.AddMinutes(10);
 
-            var user = new User
+            var pending = await _pendingRegistrationRepository.GetByPhoneNumberAsync(phoneNumber);
+            if (pending == null)
             {
-                Username = request.PhoneNumber,
-                PhoneNumber = request.PhoneNumber,
-                PasswordHash = passwordHash,
-                FullName = request.FullName,
-                IsPhoneVerified = false,
-                RegistrationOtp = otp,
-                RegistrationOtpExpiry = DateTime.UtcNow.AddMinutes(10)
-            };
+                pending = new PendingRegistration
+                {
+                    PhoneNumber = phoneNumber,
+                    Otp = otp,
+                    OtpExpiry = otpExpiry
+                };
+                await _pendingRegistrationRepository.AddAsync(pending);
+            }
+            else
+            {
+                // Restarting before finishing a previous attempt: issue a new code and drop any
+                // earlier verified state so the flow starts clean.
+                pending.Otp = otp;
+                pending.OtpExpiry = otpExpiry;
+                pending.IsOtpVerified = false;
+                pending.PasswordHash = null;
+                pending.FullName = null;
+                await _pendingRegistrationRepository.UpdateAsync(pending);
+            }
 
-            await _userRepository.AddAsync(user);
+            await DispatchOtpAsync(phoneNumber, otp);
 
-            await _whatsAppService.SendMessageAsync(user.PhoneNumber, $"Your Ghasele verification code is: {otp}. This code expires in 10 minutes.");
-
-            var token = GenerateJwtToken(user);
-
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified);
+            return new RegisterResponse(phoneNumber, _errorLocalizer.Localize(ErrorCodes.OtpSent, _language.Language));
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -80,7 +109,7 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified);
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
         }
 
         public async Task<AuthResponse> AppleSignInAsync(AppleSignInRequest request)
@@ -134,7 +163,66 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified);
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+        }
+
+        /// <summary>
+        /// Signs a user in from a client-side Firebase Phone Authentication result.
+        /// </summary>
+        /// <remarks>
+        /// Google has already sent the SMS and checked the code before this is called, so a token
+        /// that verifies is sufficient proof of phone ownership and there is no password step.
+        /// This runs alongside - not instead of - the WhatsApp OTP registration flow: a number that
+        /// already has an account is matched, never duplicated.
+        /// </remarks>
+        public async Task<AuthResponse> FirebaseLoginAsync(FirebaseLoginRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.IdToken))
+            {
+                throw new AppException(ErrorCodes.FirebaseTokenMissing);
+            }
+
+            var phoneNumber = await _firebaseAuthService.VerifyIdTokenAndGetPhoneNumberAsync(request.IdToken);
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+            {
+                // 401, not 400: the request was well formed, the credential was simply not accepted.
+                throw new AppException(ErrorCodes.FirebaseTokenInvalid, 401);
+            }
+
+            // Firebase returns E.164 (+962...), which is the same form signup_screen.dart sends and
+            // the same form already stored on User.PhoneNumber - so an existing WhatsApp-registered
+            // user is found here rather than duplicated.
+            var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
+
+            if (user == null)
+            {
+                user = new User
+                {
+                    Id = Guid.NewGuid(),
+                    PhoneNumber = phoneNumber,
+                    Username = phoneNumber,
+                    FullName = phoneNumber,
+                    // This flow never sets a password. The account is reachable only through
+                    // Firebase sign-in until the user chooses one.
+                    PasswordHash = string.Empty,
+                    // Firebase verified the number before issuing the token, so unlike the WhatsApp
+                    // flow there is no separate confirmation step left to perform.
+                    IsPhoneVerified = true,
+                    Role = UserRole.Client
+                };
+
+                await _userRepository.AddAsync(user);
+            }
+            else if (!user.IsPhoneVerified)
+            {
+                // Pre-existing account whose number Firebase has now proven.
+                user.IsPhoneVerified = true;
+                await _userRepository.UpdateAsync(user);
+            }
+
+            var token = GenerateJwtToken(user);
+
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
         }
 
         // Verifies the identity token is a genuine, unexpired Apple token issued for
@@ -174,6 +262,14 @@ namespace Ghasele.Application.Services
             };
 
             var handler = new JwtSecurityTokenHandler();
+
+            // By default this handler rewrites inbound JWT claim names to the legacy
+            // WS-* URIs, so Apple's "sub" arrives as ".../identity/claims/nameidentifier"
+            // and "email" as ".../claims/emailaddress". Looking them up by their real
+            // names then returns nothing, which reads as a malformed token. Clearing the
+            // map keeps Apple's claim names exactly as they are on the wire.
+            handler.InboundClaimTypeMap.Clear();
+
             ClaimsPrincipal principal;
             try
             {
@@ -194,49 +290,83 @@ namespace Ghasele.Application.Services
             return (sub, email);
         }
 
-        public async Task<bool> VerifyRegistrationOtpAsync(string phoneNumber, string otp)
+        // Step 2: confirm the OTP. This no longer creates the account - it just marks the pending
+        // registration as verified and opens a window for the name/password step.
+        public async Task<RegisterResponse> VerifyRegistrationOtpAsync(string phoneNumber, string otp)
         {
-            var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
-            if (user == null)
+            var pending = await _pendingRegistrationRepository.GetByPhoneNumberAsync(phoneNumber);
+            if (pending == null || pending.Otp != otp || pending.OtpExpiry < DateTime.UtcNow)
             {
-                return false;
+                throw new AppException(ErrorCodes.OtpInvalidOrExpired);
             }
 
-            if (user.RegistrationOtp != otp || user.RegistrationOtpExpiry < DateTime.UtcNow)
+            pending.IsOtpVerified = true;
+            // Reuse OtpExpiry as the deadline for finishing the remaining step.
+            pending.OtpExpiry = DateTime.UtcNow.Add(CompleteRegistrationWindow);
+            await _pendingRegistrationRepository.UpdateAsync(pending);
+
+            return new RegisterResponse(phoneNumber, _errorLocalizer.Localize(ErrorCodes.OtpVerified, _language.Language));
+        }
+
+        // Step 3: the phone is verified, so take the name + password and create the real User.
+        // This is the only place a User row is created for a phone-based signup.
+        public async Task<AuthResponse> CompleteRegistrationAsync(CompleteRegistrationRequest request)
+        {
+            var pending = await _pendingRegistrationRepository.GetByPhoneNumberAsync(request.PhoneNumber);
+            if (pending == null)
             {
-                return false;
+                throw AppException.NotFound(ErrorCodes.RegistrationNotFound);
             }
 
-            user.IsPhoneVerified = true;
-            user.RegistrationOtp = null;
-            user.RegistrationOtpExpiry = null;
+            if (!pending.IsOtpVerified || pending.OtpExpiry < DateTime.UtcNow)
+            {
+                throw new AppException(ErrorCodes.RegistrationOtpNotVerified);
+            }
 
-            await _userRepository.UpdateAsync(user);
+            // Guards against a concurrent signup (another device, a retried request) already
+            // having created this account between verify and complete.
+            var existingUser = await _userRepository.GetByPhoneNumberAsync(request.PhoneNumber);
+            if (existingUser != null)
+            {
+                await _pendingRegistrationRepository.DeleteAsync(pending.Id);
+                throw new AppException(ErrorCodes.PhoneAlreadyExists, 409);
+            }
 
-            return true;
+            var user = new User
+            {
+                Username = pending.PhoneNumber,
+                PhoneNumber = pending.PhoneNumber,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                FullName = request.FullName,
+                IsPhoneVerified = true
+            };
+
+            await _userRepository.AddAsync(user);
+            await _pendingRegistrationRepository.DeleteAsync(pending.Id);
+
+            var token = GenerateJwtToken(user);
+
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
         }
 
         public async Task ResendRegistrationOtpAsync(string phoneNumber)
         {
-            var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
-            if (user == null)
+            var pending = await _pendingRegistrationRepository.GetByPhoneNumberAsync(phoneNumber);
+            if (pending == null)
             {
-                throw AppException.NotFound(ErrorCodes.PhoneNotRegistered);
-            }
-
-            if (user.IsPhoneVerified)
-            {
-                throw new AppException(ErrorCodes.PhoneAlreadyVerified);
+                throw AppException.NotFound(ErrorCodes.RegistrationNotFound);
             }
 
             var otp = GenerateOtp();
 
-            user.RegistrationOtp = otp;
-            user.RegistrationOtpExpiry = DateTime.UtcNow.AddMinutes(10);
+            pending.Otp = otp;
+            pending.OtpExpiry = DateTime.UtcNow.AddMinutes(10);
+            // A fresh code has to be re-confirmed.
+            pending.IsOtpVerified = false;
 
-            await _userRepository.UpdateAsync(user);
+            await _pendingRegistrationRepository.UpdateAsync(pending);
 
-            await _whatsAppService.SendMessageAsync(phoneNumber, $"Your Ghasele verification code is: {otp}. This code expires in 10 minutes.");
+            await DispatchOtpAsync(phoneNumber, otp);
         }
 
         public async Task UpdateFcmTokenAsync(Guid userId, string token)
@@ -275,8 +405,8 @@ namespace Ghasele.Application.Services
             
             await _userRepository.UpdateAsync(user);
 
-            // Send OTP via WhatsApp
-            await _whatsAppService.SendMessageAsync(phoneNumber, $"Your Ghasele password reset code is: {otp}. This code expires in 10 minutes.");
+            // Send OTP via WhatsApp (verify_code_1 template - one {{code}} parameter).
+            await DispatchOtpAsync(phoneNumber, otp);
         }
 
         public async Task<bool> VerifyResetPasswordOtpAsync(string phoneNumber, string otp)
@@ -315,9 +445,29 @@ namespace Ghasele.Application.Services
             await _userRepository.UpdateAsync(user);
         }
 
-        private static string GenerateOtp()
+        // Test mode (Auth:UseTestOtp=true, set only in non-production configs): the OTP is a fixed,
+        // known value and nothing is sent over WhatsApp. Missing key => false => real behaviour, so
+        // production stays safe even if the section is absent.
+        private bool UseTestOtp =>
+            string.Equals(_configuration["Auth:UseTestOtp"], "true", StringComparison.OrdinalIgnoreCase);
+
+        private string GenerateOtp()
         {
-            return new Random().Next(100000, 999999).ToString();
+            return UseTestOtp
+                ? (_configuration["Auth:TestOtpCode"] ?? "123456")
+                : new Random().Next(100000, 999999).ToString();
+        }
+
+        // Delivers the OTP, or - in test mode - just logs it and skips WhatsApp entirely.
+        private async Task DispatchOtpAsync(string phoneNumber, string otp)
+        {
+            if (UseTestOtp)
+            {
+                Console.WriteLine($"[TEST OTP] {phoneNumber} -> {otp}  (WhatsApp send skipped; Auth:UseTestOtp=true)");
+                return;
+            }
+
+            await _whatsAppService.SendOtpAsync(phoneNumber, otp);
         }
 
         private string GenerateJwtToken(User user)
@@ -330,7 +480,8 @@ namespace Ghasele.Application.Services
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim("username", user.Username)
+                new Claim("username", user.Username),
+                new Claim(ClaimTypes.Role, user.Role.ToString())
             };
 
             if (!string.IsNullOrEmpty(user.Email))

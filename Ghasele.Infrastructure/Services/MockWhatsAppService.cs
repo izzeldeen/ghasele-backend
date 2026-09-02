@@ -6,14 +6,14 @@ namespace Ghasele.Infrastructure.Services
 {
     public class MockWhatsAppService : IWhatsAppService
     {
-        public Task SendMessageAsync(string phoneNumber, string message)
+        public Task SendOtpAsync(string phoneNumber, string code)
         {
-            // Simulate sending a WhatsApp message by logging to the console
+            // Simulate sending the verify_code_1 template by logging to the console.
             Console.WriteLine("=============================================");
-            Console.WriteLine($"[MOCK WHATSAPP] Sending to: {phoneNumber}");
-            Console.WriteLine($"[MOCK WHATSAPP] Message: {message}");
+            Console.WriteLine($"[MOCK WHATSAPP] Template: verify_code_1 -> {phoneNumber}");
+            Console.WriteLine($"[MOCK WHATSAPP] Code: {code}");
             Console.WriteLine("=============================================");
-            
+
             return Task.CompletedTask;
         }
     }

@@ -13,8 +13,8 @@ using Swashbuckle.AspNetCore.SwaggerUI;
 using Ghasele.API.Middleware;
 using Ghasele.API.Localization;
 using Ghasele.Application.Localization;
-using WhatsappBusiness.CloudApi.Configurations;
-using WhatsappBusiness.CloudApi.Extensions;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +32,10 @@ builder.Services.AddControllers()
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IErrorLocalizer, ErrorLocalizer>();
 builder.Services.AddScoped<IRequestLocalizer, RequestLocalizer>();
+// Same resolution logic, exposed under the Application-layer abstraction so services there
+// (DriverService, CleanerService, ItemTypeService, OrderService, TripService) can pick a
+// bilingual name without depending on the API project.
+builder.Services.AddScoped<ICurrentLanguageProvider, RequestLocalizer>();
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -88,6 +92,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Dependency Injection
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IPendingRegistrationRepository, PendingRegistrationRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
@@ -109,21 +114,59 @@ builder.Services.AddScoped<IDriverRepository, DriverRepository>();
 builder.Services.AddScoped<IDriverService, DriverService>();
 builder.Services.AddScoped<IMarketingCodeRepository, MarketingCodeRepository>();
 builder.Services.AddScoped<IMarketingCodeService, MarketingCodeService>();
-var whatsAppSection = builder.Configuration.GetSection("WhatsAppBusinessCloudApiConfiguration");
-var whatsAppAccessToken = whatsAppSection["AccessToken"];
+builder.Services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
+builder.Services.AddScoped<IAppSettingsService, AppSettingsService>();
+builder.Services.AddScoped<IDeliveryWindowRepository, DeliveryWindowRepository>();
+builder.Services.AddScoped<IDeliveryWindowService, DeliveryWindowService>();
+builder.Services.AddSingleton<IFileStorageService, Ghasele.API.Services.LocalFileStorageService>();
+// ---------------------------------------------------------------------------
+// Firebase Admin SDK
+// ---------------------------------------------------------------------------
+// Created once for the whole process, here, before anything resolves it. Two services share this
+// single default app: NotificationService (FCM push) and FirebaseAuthService (phone-auth token
+// verification). FirebaseApp.Create throws if a default app already exists, which is why this is
+// centralized rather than done inside each service.
+var firebaseCredentialsPath = builder.Configuration["Firebase:CredentialsPath"];
+
+if (!string.IsNullOrWhiteSpace(firebaseCredentialsPath))
+{
+    // Resolve against the content root so one relative setting works whether the API is launched
+    // from the project folder or from a published output directory.
+    var resolvedFirebasePath = Path.IsPathRooted(firebaseCredentialsPath)
+        ? firebaseCredentialsPath
+        : Path.Combine(builder.Environment.ContentRootPath, firebaseCredentialsPath);
+
+    if (File.Exists(resolvedFirebasePath))
+    {
+        if (FirebaseApp.DefaultInstance == null)
+        {
+            FirebaseApp.Create(new AppOptions
+            {
+                Credential = GoogleCredential.FromFile(resolvedFirebasePath)
+            });
+        }
+    }
+    else
+    {
+        // Deliberately not fatal: FCM push already degrades to simulated sends without it, and
+        // failing startup would take the whole API down over an optional file. Firebase login
+        // returns 401 while this is unresolved, and FirebaseAuthService logs the reason.
+        Console.WriteLine($"[FIREBASE] Credentials file not found at '{resolvedFirebasePath}'. " +
+                          "Firebase login will be unavailable and FCM notifications simulated.");
+    }
+}
+
+// Verifies Firebase ID tokens for the phone-auth login endpoint. Registered independently of the
+// WhatsApp OTP services above, which stay in place as the fallback sign-up path.
+builder.Services.AddScoped<IFirebaseAuthService, FirebaseAuthService>();
+
+builder.Services.AddHttpClient<Ghasele.API.Controllers.WhatsAppTestController>();
+var whatsAppAccessToken = builder.Configuration["WhatsApp:AccessToken"];
 
 if (!string.IsNullOrWhiteSpace(whatsAppAccessToken))
 {
-    var whatsAppConfig = new WhatsAppBusinessCloudApiConfig
-    {
-        WhatsAppBusinessPhoneNumberId = whatsAppSection["WhatsAppBusinessPhoneNumberId"] ?? string.Empty,
-        WhatsAppBusinessAccountId = whatsAppSection["WhatsAppBusinessAccountId"] ?? string.Empty,
-        WhatsAppBusinessId = whatsAppSection["WhatsAppBusinessId"] ?? string.Empty,
-        AccessToken = whatsAppAccessToken
-    };
-
-    builder.Services.AddWhatsAppBusinessCloudApiService(whatsAppConfig);
-    builder.Services.AddScoped<IWhatsAppService, Ghasele.Infrastructure.Services.WhatsAppCloudApiService>();
+    builder.Services.AddHttpClient<IWhatsAppService, Ghasele.Infrastructure.Services.WhatsAppGraphApiService>(
+        client => client.Timeout = TimeSpan.FromSeconds(15));
 }
 else
 {
@@ -199,6 +242,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
+
+// Serves customer-uploaded support photos from wwwroot/uploads/**.
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();

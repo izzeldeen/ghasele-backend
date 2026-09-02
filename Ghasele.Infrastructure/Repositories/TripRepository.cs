@@ -48,10 +48,34 @@ namespace Ghasele.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<Trip>> GetByDriverIdAsync(Guid driverId)
+        {
+            return await _context.Trips
+                .Include(t => t.Orders)
+                    .ThenInclude(o => o.Items)
+                .Include(t => t.Orders)
+                    .ThenInclude(o => o.User)
+                .Include(t => t.Cleaner)
+                .Include(t => t.Driver)
+                .Where(t => t.AssignedDriverId == driverId)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+        }
+
         public async Task UpdateAsync(Trip trip)
         {
             _context.Trips.Update(trip);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            var trip = await _context.Trips.FindAsync(id);
+            if (trip != null)
+            {
+                _context.Trips.Remove(trip);
+                await _context.SaveChangesAsync();
+            }
         }
     }
 }

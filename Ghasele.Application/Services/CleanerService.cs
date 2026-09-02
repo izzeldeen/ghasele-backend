@@ -14,17 +14,20 @@ namespace Ghasele.Application.Services
     public class CleanerService : ICleanerService
     {
         private readonly ICleanerRepository _cleanerRepository;
+        private readonly ICurrentLanguageProvider _language;
 
-        public CleanerService(ICleanerRepository cleanerRepository)
+        public CleanerService(ICleanerRepository cleanerRepository, ICurrentLanguageProvider language)
         {
             _cleanerRepository = cleanerRepository;
+            _language = language;
         }
 
         public async Task<CleanerDto> CreateCleanerAsync(CreateCleanerDto dto)
         {
             var cleaner = new Cleaner
             {
-                Name = dto.Name,
+                NameAr = dto.NameAr,
+                NameEn = dto.NameEn,
                 Note = dto.Note,
                 CleaningLocation = dto.CleaningLocation,
                 Latitude = dto.Latitude,
@@ -53,7 +56,8 @@ namespace Ghasele.Application.Services
             var cleaner = await _cleanerRepository.GetByIdAsync(id);
             if (cleaner == null) throw AppException.NotFound(ErrorCodes.CleanerNotFound);
 
-            if (!string.IsNullOrEmpty(dto.Name)) cleaner.Name = dto.Name;
+            if (!string.IsNullOrEmpty(dto.NameAr)) cleaner.NameAr = dto.NameAr;
+            if (!string.IsNullOrEmpty(dto.NameEn)) cleaner.NameEn = dto.NameEn;
             if (dto.Note != null) cleaner.Note = dto.Note;
             if (dto.CleaningLocation != null) cleaner.CleaningLocation = dto.CleaningLocation;
             if (dto.Latitude.HasValue) cleaner.Latitude = dto.Latitude.Value;
@@ -68,12 +72,14 @@ namespace Ghasele.Application.Services
             await _cleanerRepository.DeleteAsync(id);
         }
 
-        private static CleanerDto MapToDto(Cleaner cleaner)
+        private CleanerDto MapToDto(Cleaner cleaner)
         {
             return new CleanerDto
             {
                 Id = cleaner.Id,
-                Name = cleaner.Name,
+                NameAr = cleaner.NameAr,
+                NameEn = cleaner.NameEn,
+                Name = BilingualText.Pick(cleaner.NameAr, cleaner.NameEn, _language.Language),
                 Note = cleaner.Note,
                 CleaningLocation = cleaner.CleaningLocation,
                 Latitude = cleaner.Latitude,

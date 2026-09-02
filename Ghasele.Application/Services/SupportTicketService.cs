@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Exceptions;
+using Ghasele.Application.Interfaces;
+using Ghasele.Application.Localization;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -12,15 +15,37 @@ namespace Ghasele.Application.Services
     {
         private readonly ISupportTicketRepository _repository;
         private readonly IUserRepository _userRepository;
+        private readonly IFileStorageService _fileStorage;
 
-        public SupportTicketService(ISupportTicketRepository repository, IUserRepository userRepository)
+        // 5 MB is plenty for a phone photo and keeps a hostile upload cheap to reject.
+        private const long MaxAttachmentBytes = 5 * 1024 * 1024;
+        private static readonly string[] AllowedContentTypes =
+            { "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif" };
+
+        public SupportTicketService(ISupportTicketRepository repository, IUserRepository userRepository, IFileStorageService fileStorage)
         {
             _repository = repository;
             _userRepository = userRepository;
+            _fileStorage = fileStorage;
         }
 
-        public async Task<TicketDto> CreateTicketAsync(string userId, CreateTicketDto dto)
+        public async Task<TicketDto> CreateTicketAsync(string userId, CreateTicketDto dto, TicketAttachmentUpload? attachment = null)
         {
+            string? attachmentUrl = null;
+            if (attachment != null && attachment.Length > 0)
+            {
+                if (attachment.Length > MaxAttachmentBytes)
+                {
+                    throw new AppException(ErrorCodes.TicketAttachmentTooLarge);
+                }
+                if (Array.IndexOf(AllowedContentTypes, attachment.ContentType?.ToLowerInvariant()) < 0)
+                {
+                    throw new AppException(ErrorCodes.TicketAttachmentInvalidType);
+                }
+
+                attachmentUrl = await _fileStorage.SaveAsync(attachment.Content, attachment.FileName, "support");
+            }
+
             var ticket = new SupportTicket
             {
                 UserId = userId,
@@ -28,6 +53,7 @@ namespace Ghasele.Application.Services
                 Message = dto.Message,
                 Category = dto.Category,
                 Status = "Open",
+                AttachmentUrl = attachmentUrl,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -91,6 +117,7 @@ namespace Ghasele.Application.Services
                 Category = ticket.Category,
                 Status = ticket.Status,
                 Response = ticket.Response,
+                AttachmentUrl = ticket.AttachmentUrl,
                 CreatedAt = ticket.CreatedAt,
                 UpdatedAt = ticket.UpdatedAt,
                 UserName = user?.FullName,

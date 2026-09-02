@@ -5,8 +5,9 @@ namespace Ghasele.Domain.Entities
     public class ItemType
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public string TypeName { get; set; } = string.Empty;
-        
+        public string TypeNameAr { get; set; } = string.Empty;
+        public string TypeNameEn { get; set; } = string.Empty;
+
         // Ironing
         public decimal IronPrice { get; set; }
         public decimal IronCost { get; set; }

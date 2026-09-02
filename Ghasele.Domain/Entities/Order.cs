@@ -14,6 +14,13 @@ namespace Ghasele.Domain.Entities
         public decimal CleanerAmount { get; set; }
         public string ReferenceNumber { get; set; } = string.Empty;
         public OrderStatus Status { get; set; } = OrderStatus.PendingCollection;
+
+        /// <summary>
+        /// Chosen by the customer at checkout. Drives which delivery fee is stamped on
+        /// the order and how prominently it surfaces in the admin's trip-building screen.
+        /// </summary>
+        public OrderType Type { get; set; } = OrderType.Normal;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation Property

@@ -13,7 +13,7 @@ namespace Ghasele.API.Localization
     /// expired OTP — all occur on anonymous requests where there is no user to read a preference
     /// from.
     /// </remarks>
-    public class RequestLocalizer : IRequestLocalizer
+    public class RequestLocalizer : IRequestLocalizer, ICurrentLanguageProvider
     {
         private const string OverrideHeader = "X-Language";
         private const string CacheKey = "__resolved_language";
