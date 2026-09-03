@@ -22,11 +22,36 @@ namespace Ghasele.Application.Services
         private static readonly string[] AllowedContentTypes =
             { "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif" };
 
+        // Clients that build the multipart part without an explicit content type send
+        // application/octet-stream, so the extension is the only signal left. App
+        // versions <= 1.0.1 do exactly that, and rejecting them would break photo
+        // uploads for everyone who has not updated.
+        private static readonly string[] AllowedExtensions =
+            { ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif" };
+
         public SupportTicketService(ISupportTicketRepository repository, IUserRepository userRepository, IFileStorageService fileStorage)
         {
             _repository = repository;
             _userRepository = userRepository;
             _fileStorage = fileStorage;
+        }
+
+        /// <summary>
+        /// Accepts the upload when either the declared content type or the file extension
+        /// names an image. Both are client-supplied and trivially forged, so this is a
+        /// usability guard against wrong-file uploads, not a security boundary - the
+        /// stored file is never executed and is served back as a static asset.
+        /// </summary>
+        private static bool IsAllowedImage(TicketAttachmentUpload attachment)
+        {
+            var contentType = attachment.ContentType?.Trim().ToLowerInvariant();
+            if (!string.IsNullOrEmpty(contentType) && Array.IndexOf(AllowedContentTypes, contentType) >= 0)
+            {
+                return true;
+            }
+
+            var extension = Path.GetExtension(attachment.FileName ?? string.Empty).ToLowerInvariant();
+            return Array.IndexOf(AllowedExtensions, extension) >= 0;
         }
 
         public async Task<TicketDto> CreateTicketAsync(string userId, CreateTicketDto dto, TicketAttachmentUpload? attachment = null)
@@ -38,7 +63,7 @@ namespace Ghasele.Application.Services
                 {
                     throw new AppException(ErrorCodes.TicketAttachmentTooLarge);
                 }
-                if (Array.IndexOf(AllowedContentTypes, attachment.ContentType?.ToLowerInvariant()) < 0)
+                if (!IsAllowedImage(attachment))
                 {
                     throw new AppException(ErrorCodes.TicketAttachmentInvalidType);
                 }
