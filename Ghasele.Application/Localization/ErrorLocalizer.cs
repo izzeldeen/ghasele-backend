@@ -39,6 +39,10 @@ namespace Ghasele.Application.Localization
 
             [ErrorCodes.FirebaseTokenMissing] = "Missing Firebase token.",
             [ErrorCodes.FirebaseTokenInvalid] = "Phone verification could not be confirmed. Please try again.",
+            [ErrorCodes.GoogleTokenMissing] = "Missing Google token.",
+            [ErrorCodes.GoogleTokenInvalid] = "Google sign-in could not be verified. Please try again.",
+            [ErrorCodes.GoogleEmailMissing] = "This Google account has no verified email address.",
+            [ErrorCodes.PasswordRequired] = "Please choose a password of at least 6 characters.",
 
             [ErrorCodes.OrderNotFound] = "Order not found.",
             [ErrorCodes.OrderPendingExists] = "You already have a pending order. Please wait for it to be processed.",
@@ -109,6 +113,10 @@ namespace Ghasele.Application.Localization
 
             [ErrorCodes.FirebaseTokenMissing] = "رمز Firebase مفقود.",
             [ErrorCodes.FirebaseTokenInvalid] = "تعذّر تأكيد التحقق من رقم الهاتف. يرجى المحاولة مرة أخرى.",
+            [ErrorCodes.GoogleTokenMissing] = "رمز Google مفقود.",
+            [ErrorCodes.GoogleTokenInvalid] = "تعذّر التحقق من تسجيل الدخول عبر Google. يرجى المحاولة مرة أخرى.",
+            [ErrorCodes.GoogleEmailMissing] = "لا يوجد بريد إلكتروني موثّق في حساب Google هذا.",
+            [ErrorCodes.PasswordRequired] = "يرجى اختيار كلمة مرور لا تقل عن 6 أحرف.",
 
             [ErrorCodes.OrderNotFound] = "لم يتم العثور على الطلب.",
             [ErrorCodes.OrderPendingExists] = "لديك طلب قيد الانتظار بالفعل. يرجى انتظار معالجته.",

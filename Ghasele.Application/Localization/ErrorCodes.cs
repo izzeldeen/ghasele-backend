@@ -40,6 +40,12 @@ namespace Ghasele.Application.Localization
         public const string FirebaseTokenMissing = "auth.firebase_token_missing";
         public const string FirebaseTokenInvalid = "auth.firebase_token_invalid";
 
+        // Google sign-in (client-side Google credential exchanged through Firebase).
+        public const string GoogleTokenMissing = "auth.google_token_missing";
+        public const string GoogleTokenInvalid = "auth.google_token_invalid";
+        public const string GoogleEmailMissing = "auth.google_email_missing";
+        public const string PasswordRequired = "auth.password_required";
+
         // Orders
         public const string OrderNotFound = "order.not_found";
         public const string OrderPendingExists = "order.pending_exists";

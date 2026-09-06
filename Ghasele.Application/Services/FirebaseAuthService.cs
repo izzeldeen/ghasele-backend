@@ -25,6 +25,17 @@ namespace Ghasele.Application.Services
         /// <summary>Set by Firebase only after it has itself verified the SMS code.</summary>
         private const string PhoneNumberClaim = "phone_number";
 
+        /// <summary>Set by providers that carry an email - Google, Apple, email/password.</summary>
+        private const string EmailClaim = "email";
+
+        /// <summary>
+        /// Whether the provider proved the address. Google always sets it true; without it an email
+        /// is just a self-asserted string and must not be used to match an existing account.
+        /// </summary>
+        private const string EmailVerifiedClaim = "email_verified";
+
+        private const string NameClaim = "name";
+
         private readonly ILogger<FirebaseAuthService> _logger;
 
         public FirebaseAuthService(ILogger<FirebaseAuthService> logger)
@@ -34,48 +45,9 @@ namespace Ghasele.Application.Services
 
         public async Task<string?> VerifyIdTokenAndGetPhoneNumberAsync(string idToken)
         {
-            if (string.IsNullOrWhiteSpace(idToken))
+            var decoded = await DecodeAsync(idToken);
+            if (decoded == null)
             {
-                _logger.LogWarning("Firebase login attempted with an empty ID token.");
-                return null;
-            }
-
-            // Guard explicitly rather than letting DefaultInstance throw a NullReferenceException:
-            // a missing Firebase:CredentialsPath is a server misconfiguration, and the log line
-            // needs to say so plainly instead of surfacing as an opaque 500.
-            if (FirebaseApp.DefaultInstance == null)
-            {
-                _logger.LogError(
-                    "Firebase Admin SDK is not initialized - check Firebase:CredentialsPath. " +
-                    "Rejecting the Firebase login attempt.");
-                return null;
-            }
-
-            FirebaseToken decoded;
-            try
-            {
-                // checkRevoked: true costs one extra round trip to Google but is what makes a
-                // disabled account or a signed-out-everywhere session stop working immediately.
-                // Without it a leaked token stays usable for the rest of its hour.
-                decoded = await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(idToken, checkRevoked: true);
-            }
-            catch (FirebaseAuthException ex)
-            {
-                // Expired, malformed, revoked, or issued for a different Firebase project. All of
-                // these are "this caller is not authenticated" - the distinction is only useful in
-                // our own logs, so it is recorded here and not returned.
-                _logger.LogWarning(
-                    ex,
-                    "Firebase ID token rejected. AuthErrorCode={AuthErrorCode}, ErrorCode={ErrorCode}",
-                    ex.AuthErrorCode,
-                    ex.ErrorCode);
-                return null;
-            }
-            catch (Exception ex)
-            {
-                // Network failure reaching Google, clock skew, a malformed service account file.
-                // Still not a usable login, but distinct from a rejected token, so log louder.
-                _logger.LogError(ex, "Unexpected failure while verifying a Firebase ID token.");
                 return null;
             }
 
@@ -97,5 +69,80 @@ namespace Ghasele.Application.Services
             // the apps already store.
             return phoneNumber.Trim();
         }
+
+        public async Task<FirebaseIdentity?> VerifyIdTokenAsync(string idToken)
+        {
+            var decoded = await DecodeAsync(idToken);
+            if (decoded == null)
+            {
+                return null;
+            }
+
+            return new FirebaseIdentity(
+                Uid: decoded.Uid,
+                PhoneNumber: ReadString(decoded, PhoneNumberClaim),
+                Email: ReadString(decoded, EmailClaim),
+                EmailVerified: ReadBool(decoded, EmailVerifiedClaim),
+                Name: ReadString(decoded, NameClaim));
+        }
+
+        /// <summary>
+        /// Shared verification step: everything both public methods do before they look at claims.
+        /// </summary>
+        /// <returns>The decoded token, or <c>null</c> for every unusable case (all logged here).</returns>
+        private async Task<FirebaseToken?> DecodeAsync(string idToken)
+        {
+            if (string.IsNullOrWhiteSpace(idToken))
+            {
+                _logger.LogWarning("Firebase login attempted with an empty ID token.");
+                return null;
+            }
+
+            // Guard explicitly rather than letting DefaultInstance throw a NullReferenceException:
+            // a missing Firebase:CredentialsPath is a server misconfiguration, and the log line
+            // needs to say so plainly instead of surfacing as an opaque 500.
+            if (FirebaseApp.DefaultInstance == null)
+            {
+                _logger.LogError(
+                    "Firebase Admin SDK is not initialized - check Firebase:CredentialsPath. " +
+                    "Rejecting the Firebase login attempt.");
+                return null;
+            }
+
+            try
+            {
+                // checkRevoked: true costs one extra round trip to Google but is what makes a
+                // disabled account or a signed-out-everywhere session stop working immediately.
+                // Without it a leaked token stays usable for the rest of its hour.
+                return await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(idToken, checkRevoked: true);
+            }
+            catch (FirebaseAuthException ex)
+            {
+                // Expired, malformed, revoked, or issued for a different Firebase project. All of
+                // these are "this caller is not authenticated" - the distinction is only useful in
+                // our own logs, so it is recorded here and not returned.
+                _logger.LogWarning(
+                    ex,
+                    "Firebase ID token rejected. AuthErrorCode={AuthErrorCode}, ErrorCode={ErrorCode}",
+                    ex.AuthErrorCode,
+                    ex.ErrorCode);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                // Network failure reaching Google, clock skew, a malformed service account file.
+                // Still not a usable login, but distinct from a rejected token, so log louder.
+                _logger.LogError(ex, "Unexpected failure while verifying a Firebase ID token.");
+                return null;
+            }
+        }
+
+        private static string? ReadString(FirebaseToken token, string claim) =>
+            token.Claims.TryGetValue(claim, out var raw) && raw is string value && !string.IsNullOrWhiteSpace(value)
+                ? value.Trim()
+                : null;
+
+        private static bool ReadBool(FirebaseToken token, string claim) =>
+            token.Claims.TryGetValue(claim, out var raw) && raw is bool value && value;
     }
 }

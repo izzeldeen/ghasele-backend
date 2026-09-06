@@ -6,6 +6,16 @@ namespace Ghasele.Application.DTOs
     /// the backend sends a WhatsApp OTP.
     public record StartRegistrationRequest(string PhoneNumber);
 
+    /// Body of <c>POST /api/auth/phone-registered</c>: asked before any code is sent, so a number
+    /// that already has an account is refused on the first screen instead of after an SMS has gone
+    /// out. A POST rather than a GET so the number stays out of access logs and proxy caches.
+    public record PhoneRegisteredRequest(string? PhoneNumber);
+
+    /// Reply to <c>POST /api/auth/phone-registered</c>. <c>Message</c> carries the localized
+    /// "already registered" text when <c>Registered</c> is true and is null otherwise, so the
+    /// client can show the server's wording rather than shipping its own copy.
+    public record PhoneRegisteredResponse(bool Registered, string? Message);
+
     /// Step 3 of the phone-first registration flow: once the OTP is confirmed, the user picks a
     /// name and password and the account is created.
     public record CompleteRegistrationRequest(string PhoneNumber, string FullName, string Password);

@@ -30,6 +30,34 @@ namespace Ghasele.API.Controllers
             return Ok(response);
         }
 
+        /// <summary>
+        /// Whether a phone number already has an account, asked before step 1 dispatches a code.
+        /// </summary>
+        /// <remarks>
+        /// The WhatsApp path is refused by <c>start-registration</c> itself, but the Firebase path
+        /// never touches this API until the code has already been sent and the user has filled in a
+        /// name and password - so without this the duplicate only surfaced at the very last step.
+        /// <para>
+        /// Anonymous by necessity: it is consulted before any account or token exists. It does
+        /// confirm whether a number is registered, which the 409 from <c>start-registration</c>
+        /// already revealed, so it opens no path that was previously closed.
+        /// </para>
+        /// </remarks>
+        /// <response code="200">Always. The answer is in the body, not the status code.</response>
+        [HttpPost("phone-registered")]
+        [ProducesResponseType(typeof(PhoneRegisteredResponse), StatusCodes.Status200OK)]
+        public async Task<IActionResult> PhoneRegistered([FromBody] PhoneRegisteredRequest request)
+        {
+            // A missing or blank number is answered "not registered" rather than 400: the client
+            // validates the format first, and a 400 here would block signup on a bad round trip.
+            var registered = request is not null
+                && await _authService.IsPhoneRegisteredAsync(request.PhoneNumber ?? string.Empty);
+
+            return Ok(new PhoneRegisteredResponse(
+                registered,
+                registered ? L(ErrorCodes.PhoneAlreadyExists) : null));
+        }
+
         // Step 2: user enters the code. On success the phone is marked verified but no account
         // exists yet - the client moves on to collect a name and password.
         [HttpPost("verify-registration-otp")]
