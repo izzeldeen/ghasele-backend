@@ -36,6 +36,16 @@ namespace Ghasele.Application.Services
             // processed. The old one-open-order-at-a-time rule was removed by product;
             // HasPendingOrderAsync is still exposed on the repository for reporting.
 
+            // No UserId means a guest checkout. The contact number is then the only route to the
+            // customer, so it is required here rather than trusted to the client's own validation.
+            var isGuest = dto.UserId == null;
+            var contactPhoneNumber = dto.ContactPhoneNumber?.Trim();
+
+            if (isGuest && string.IsNullOrWhiteSpace(contactPhoneNumber))
+            {
+                throw new AppException(ErrorCodes.GuestContactNumberRequired);
+            }
+
             var orderType = OrderType.Normal;
             if (!string.IsNullOrEmpty(dto.Type) && Enum.TryParse<OrderType>(dto.Type, true, out var parsedType))
             {
@@ -55,6 +65,10 @@ namespace Ghasele.Application.Services
                 Lat = dto.Lat,
                 Long = dto.Long,
                 UserId = dto.UserId,
+                IsGuest = isGuest,
+                // Only stored for guests; a signed-in order carries the number on the user row,
+                // and duplicating it here would let the two drift apart.
+                ContactPhoneNumber = isGuest ? contactPhoneNumber : null,
                 TotalAmount = dto.TotalAmount,
                 NetAmount = dto.NetAmount,
                 DeliveryAmount = deliveryAmount,
@@ -278,9 +292,14 @@ namespace Ghasele.Application.Services
                 Lat = order.Lat,
                 Long = order.Long,
                 UserId = order.UserId,
-                UserFullName = order.User?.FullName ?? "Unknown Customer",
+                IsGuest = order.IsGuest,
+                UserFullName = order.User?.FullName ?? (order.IsGuest ? "Guest" : "Unknown Customer"),
                 UserEmail = order.User?.Email ?? string.Empty,
-                UserPhoneNumber = !string.IsNullOrEmpty(order.User?.PhoneNumber) ? order.User.PhoneNumber : "No Phone",
+                // A guest has no user row, so the number captured at checkout is the only way to
+                // reach them. Drivers read UserPhoneNumber regardless of which kind of order it is.
+                UserPhoneNumber = !string.IsNullOrEmpty(order.User?.PhoneNumber)
+                    ? order.User.PhoneNumber
+                    : (!string.IsNullOrEmpty(order.ContactPhoneNumber) ? order.ContactPhoneNumber : "No Phone"),
                 TotalAmount = order.TotalAmount,
                 NetAmount = order.NetAmount,
                 DeliveryAmount = order.DeliveryAmount,

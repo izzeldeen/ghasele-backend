@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Security.Claims;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Interfaces;
 using Ghasele.Application.Localization;
@@ -21,11 +23,27 @@ namespace Ghasele.API.Controllers
             _orderService = orderService;
         }
 
+        /// <summary>
+        /// Places an order. Open to guests, unlike the rest of this controller.
+        /// </summary>
+        /// <remarks>
+        /// The owner is always taken from the bearer token, never from the body: an anonymous
+        /// caller could otherwise pass any customer's id and file an order against their account.
+        /// No token means a guest order, which the service requires a contact number for.
+        /// </remarks>
+        [AllowAnonymous]
         [HttpPost]
         public async Task<IActionResult> CreateOrder([FromBody] CreateOrderDto dto)
         {
             try
             {
+                // Same claim pair AuthController.DeleteAccount reads, so both agree on who the
+                // caller is regardless of which one issued the token.
+                var callerId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                               ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                dto.UserId = Guid.TryParse(callerId, out var callerGuid) ? callerGuid : null;
+
                 var order = await _orderService.CreateOrderAsync(dto);
                 return Ok(order);
             }

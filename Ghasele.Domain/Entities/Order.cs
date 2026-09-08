@@ -7,7 +7,26 @@ namespace Ghasele.Domain.Entities
         public Guid Id { get; set; } = Guid.NewGuid();
         public double Lat { get; set; }
         public double Long { get; set; }
-        public Guid UserId { get; set; }
+        /// <summary>
+        /// Owner of the order, or null for a guest order placed without an account.
+        /// </summary>
+        public Guid? UserId { get; set; }
+
+        /// <summary>
+        /// True when the order was placed without signing in. A separate column rather than
+        /// inferred from UserId being null, so the distinction survives any later account linking
+        /// and admin screens can filter on it directly.
+        /// </summary>
+        public bool IsGuest { get; set; }
+
+        /// <summary>
+        /// Phone number captured at checkout for a guest order, in E.164 (+962...).
+        /// </summary>
+        /// <remarks>
+        /// A guest has no user row, so this is the only way a driver can reach them. Required for
+        /// guest orders; null for signed-in ones, which carry the number on the user record.
+        /// </remarks>
+        public string? ContactPhoneNumber { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal NetAmount { get; set; }
         public decimal DeliveryAmount { get; set; }

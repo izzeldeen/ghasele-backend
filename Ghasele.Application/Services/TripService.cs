@@ -133,11 +133,13 @@ namespace Ghasele.Application.Services
             // Notifications
             foreach (var order in trip.Orders)
             {
-                if (order.User != null)
+                // A guest order has no user row and no device to notify, so it is skipped here.
+                // Matching on UserId as well makes the non-null owner explicit to the compiler.
+                if (order.User != null && order.UserId is Guid ownerId)
                 {
                     string title = "تحديث طلب";
                     string body = "السائق في الطريق لاستلام طلبك!";
-                    await _userNotificationService.CreateNotificationAsync(order.UserId, title, body);
+                    await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
                     if (!string.IsNullOrEmpty(order.User.FcmToken))
                     {
                         await _notificationService.SendNotificationAsync(order.User.FcmToken, title, body);
@@ -211,11 +213,12 @@ namespace Ghasele.Application.Services
             // Side Effects
             if (status == OrderStatus.OutForDelivery)
             {
-                if (order.User != null)
+                // Guest orders have no account to notify - see the collection notification above.
+                if (order.User != null && order.UserId is Guid ownerId)
                 {
                     string title = "تحديث طلب";
                     string body = "طلبك الآن في طريقه إليك!";
-                    await _userNotificationService.CreateNotificationAsync(order.UserId, title, body);
+                    await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
                     if (!string.IsNullOrEmpty(order.User.FcmToken))
                     {
                         await _notificationService.SendNotificationAsync(order.User.FcmToken, title, body);

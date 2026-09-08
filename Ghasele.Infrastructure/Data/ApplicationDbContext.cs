@@ -65,9 +65,13 @@ namespace Ghasele.Infrastructure.Data
                 entity.Property(e => e.Status).HasConversion<string>();
                 entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(20);
 
+                // UserId is optional so a guest order can exist with no user row. Cascade stays
+                // explicit: deleting an account still removes its orders, which the account
+                // deletion flow relies on. Guest orders have no owner to cascade from.
                 entity.HasOne(o => o.User)
                       .WithMany()
                       .HasForeignKey(o => o.UserId)
+                      .IsRequired(false)
                       .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasOne(o => o.Trip)

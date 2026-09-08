@@ -42,6 +42,7 @@ namespace Ghasele.Application.Localization
 
             [ErrorCodes.OrderNotFound] = "Order not found.",
             [ErrorCodes.OrderPendingExists] = "You already have a pending order. Please wait for it to be processed.",
+            [ErrorCodes.GuestContactNumberRequired] = "Please enter a contact number so the driver can reach you.",
             [ErrorCodes.OrderNotPartOfTrip] = "This order is not part of a trip.",
             [ErrorCodes.OrderDeleted] = "Order deleted successfully.",
             [ErrorCodes.OrderItemNotFound] = "Order item not found.",
@@ -112,6 +113,7 @@ namespace Ghasele.Application.Localization
 
             [ErrorCodes.OrderNotFound] = "لم يتم العثور على الطلب.",
             [ErrorCodes.OrderPendingExists] = "لديك طلب قيد الانتظار بالفعل. يرجى انتظار معالجته.",
+            [ErrorCodes.GuestContactNumberRequired] = "يرجى إدخال رقم للتواصل ليتمكن السائق من الوصول إليك.",
             [ErrorCodes.OrderNotPartOfTrip] = "هذا الطلب غير مرتبط بأي رحلة.",
             [ErrorCodes.OrderDeleted] = "تم حذف الطلب بنجاح.",
             [ErrorCodes.OrderItemNotFound] = "لم يتم العثور على عنصر الطلب.",

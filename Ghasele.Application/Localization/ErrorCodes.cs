@@ -43,6 +43,9 @@ namespace Ghasele.Application.Localization
         // Orders
         public const string OrderNotFound = "order.not_found";
         public const string OrderPendingExists = "order.pending_exists";
+
+        /// <summary>A guest checkout arrived with no contact number.</summary>
+        public const string GuestContactNumberRequired = "order.guest_contact_number_required";
         public const string OrderNotPartOfTrip = "order.not_part_of_trip";
         public const string OrderDeleted = "order.deleted";
         public const string OrderItemNotFound = "orderitem.not_found";
