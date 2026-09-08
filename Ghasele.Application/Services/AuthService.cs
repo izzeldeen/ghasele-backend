@@ -97,6 +97,22 @@ namespace Ghasele.Application.Services
             return new RegisterResponse(phoneNumber, _errorLocalizer.Localize(ErrorCodes.OtpSent, _language.Language));
         }
 
+        /// <inheritdoc />
+        public async Task<bool> IsPhoneRegisteredAsync(string phoneNumber)
+        {
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+            {
+                return false;
+            }
+
+            var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber.Trim());
+
+            // An account with no password hash is a half-finished registration, not a taken number:
+            // FirebaseCompleteRegistrationAsync exists to finish those, so reporting it as
+            // registered here would leave its owner unable to complete or to sign in.
+            return user != null && !string.IsNullOrEmpty(user.PasswordHash);
+        }
+
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
         {
             var user = await _userRepository.GetByPhoneNumberAsync(request.PhoneNumber);
@@ -218,6 +234,167 @@ namespace Ghasele.Application.Services
                 // Pre-existing account whose number Firebase has now proven.
                 user.IsPhoneVerified = true;
                 await _userRepository.UpdateAsync(user);
+            }
+
+            var token = GenerateJwtToken(user);
+
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+        }
+
+        /// <summary>
+
+        /// <summary>
+        /// Completes a Firebase phone registration by creating the account with a password.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="FirebaseLoginAsync"/> creates accounts with an empty <c>PasswordHash</c>,
+        /// which meant a user who registered by SMS could never sign in with a password afterwards.
+        /// This is the registration counterpart: same proof of phone ownership, but the password is
+        /// set at the same moment the account is created.
+        /// <para>
+        /// It also heals accounts already created without one: an existing user whose hash is empty
+        /// gets the chosen password. An account that already has a password is never overwritten -
+        /// the caller is simply signed in, so re-running registration on a real account cannot be
+        /// used to take it over.
+        /// </para>
+        /// </remarks>
+        public async Task<AuthResponse> FirebaseCompleteRegistrationAsync(FirebaseCompleteRegistrationRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.IdToken))
+            {
+                throw new AppException(ErrorCodes.FirebaseTokenMissing);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Trim().Length < 6)
+            {
+                throw new AppException(ErrorCodes.PasswordRequired);
+            }
+
+            var phoneNumber = await _firebaseAuthService.VerifyIdTokenAndGetPhoneNumberAsync(request.IdToken);
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+            {
+                throw new AppException(ErrorCodes.FirebaseTokenInvalid, 401);
+            }
+
+            var fullName = string.IsNullOrWhiteSpace(request.FullName)
+                ? phoneNumber
+                : request.FullName!.Trim();
+
+            var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
+
+            // The number already has a complete account. Without this the branch below would treat
+            // a duplicate registration as a repair: it keeps the existing hash, silently discards
+            // the password just chosen, and hands back a JWT - signing the user into an account
+            // they thought they were creating. An account with an empty hash still falls through,
+            // because finishing those is exactly what this endpoint is for.
+            if (user != null && !string.IsNullOrEmpty(user.PasswordHash))
+            {
+                throw new AppException(ErrorCodes.PhoneAlreadyExists, 409);
+            }
+
+            if (user == null)
+            {
+                user = new User
+                {
+                    Id = Guid.NewGuid(),
+                    PhoneNumber = phoneNumber,
+                    Username = phoneNumber,
+                    FullName = fullName,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                    IsPhoneVerified = true,
+                    Role = UserRole.Client
+                };
+
+                await _userRepository.AddAsync(user);
+            }
+            else
+            {
+                var changed = false;
+
+                if (string.IsNullOrEmpty(user.PasswordHash))
+                {
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+                    changed = true;
+                }
+
+                if (!user.IsPhoneVerified)
+                {
+                    user.IsPhoneVerified = true;
+                    changed = true;
+                }
+
+                // The user typed this name on the "complete your profile" screen, so it is a
+                // deliberate choice and wins over whatever is stored - including the name Apple
+                // supplied when the account was created that way. Only a blank entry is ignored,
+                // in which case fullName has already fallen back to the phone number. This grants
+                // no new access: whoever verified the number can set the password regardless.
+                if (!string.IsNullOrWhiteSpace(request.FullName) && user.FullName != fullName)
+                {
+                    user.FullName = fullName;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    await _userRepository.UpdateAsync(user);
+                }
+            }
+
+            var token = GenerateJwtToken(user);
+
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+        }
+        /// Signs a user in from a client-side Google sign-in result.
+        /// </summary>
+        /// <remarks>
+        /// Separate from <see cref="FirebaseLoginAsync"/> even though both verify a Firebase ID
+        /// token: that one requires a <c>phone_number</c> claim and would reject every Google token,
+        /// and it is the path the phone flow depends on. Account matching mirrors
+        /// <see cref="AppleSignInAsync"/> - link to an existing account by email where one exists,
+        /// otherwise create.
+        /// </remarks>
+        public async Task<AuthResponse> GoogleLoginAsync(GoogleLoginRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.IdToken))
+            {
+                throw new AppException(ErrorCodes.GoogleTokenMissing);
+            }
+
+            var identity = await _firebaseAuthService.VerifyIdTokenAsync(request.IdToken);
+            if (identity == null)
+            {
+                // 401, not 400: the request was well formed, the credential was simply not accepted.
+                throw new AppException(ErrorCodes.GoogleTokenInvalid, 401);
+            }
+
+            // EmailVerified is the load-bearing check. Matching an account by an unverified address
+            // would let anyone who can mint a token claiming someone else's email take that account
+            // over; Google sets this true for real Google accounts.
+            if (string.IsNullOrWhiteSpace(identity.Email) || !identity.EmailVerified)
+            {
+                throw new AppException(ErrorCodes.GoogleEmailMissing, 401);
+            }
+
+            var email = identity.Email!;
+            var user = await _userRepository.GetByEmailAsync(email);
+
+            if (user == null)
+            {
+                user = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Email = email,
+                    Username = email,
+                    FullName = !string.IsNullOrWhiteSpace(identity.Name) ? identity.Name! : email,
+                    // Google accounts have no phone/password; keep NOT NULL columns satisfied, the
+                    // same way the Apple path does. The app collects a contact number at checkout.
+                    PhoneNumber = string.Empty,
+                    PasswordHash = string.Empty,
+                    IsPhoneVerified = false,
+                    Role = UserRole.Client
+                };
+
+                await _userRepository.AddAsync(user);
             }
 
             var token = GenerateJwtToken(user);
