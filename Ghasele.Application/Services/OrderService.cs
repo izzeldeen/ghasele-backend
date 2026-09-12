@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
 using Ghasele.Application.Localization;
+using Ghasele.Application.Scheduling;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -14,20 +16,28 @@ namespace Ghasele.Application.Services
     public class OrderService : IOrderService
     {
         private readonly IOrderRepository _orderRepository;
+        private readonly IDeliveryWindowRepository _deliveryWindowRepository;
         private readonly IItemTypeRepository _itemTypeRepository;
+        private readonly ICleanerItemPriceRepository _cleanerItemPriceRepository;
         private readonly IMarketingCodeRepository _marketingCodeRepository;
         private readonly ITripRepository _tripRepository;
         private readonly IAppSettingsRepository _appSettingsRepository;
         private readonly ICurrentLanguageProvider _language;
+        private readonly INotificationService _notificationService;
+        private readonly IUserNotificationService _userNotificationService;
 
-        public OrderService(IOrderRepository orderRepository, IItemTypeRepository itemTypeRepository, IMarketingCodeRepository marketingCodeRepository, ITripRepository tripRepository, IAppSettingsRepository appSettingsRepository, ICurrentLanguageProvider language)
+        public OrderService(IOrderRepository orderRepository, IDeliveryWindowRepository deliveryWindowRepository, IItemTypeRepository itemTypeRepository, ICleanerItemPriceRepository cleanerItemPriceRepository, IMarketingCodeRepository marketingCodeRepository, ITripRepository tripRepository, IAppSettingsRepository appSettingsRepository, ICurrentLanguageProvider language, INotificationService notificationService, IUserNotificationService userNotificationService)
         {
             _orderRepository = orderRepository;
+            _deliveryWindowRepository = deliveryWindowRepository;
             _itemTypeRepository = itemTypeRepository;
+            _cleanerItemPriceRepository = cleanerItemPriceRepository;
             _marketingCodeRepository = marketingCodeRepository;
             _tripRepository = tripRepository;
             _appSettingsRepository = appSettingsRepository;
             _language = language;
+            _notificationService = notificationService;
+            _userNotificationService = userNotificationService;
         }
 
         public async Task<OrderDto> CreateOrderAsync(CreateOrderDto dto)
@@ -40,25 +50,30 @@ namespace Ghasele.Application.Services
             // customer, so it is required here rather than trusted to the client's own validation.
             var isGuest = dto.UserId == null;
             var contactPhoneNumber = dto.ContactPhoneNumber?.Trim();
+            var deviceToken = dto.DeviceToken?.Trim();
 
             if (isGuest && string.IsNullOrWhiteSpace(contactPhoneNumber))
             {
                 throw new AppException(ErrorCodes.GuestContactNumberRequired);
             }
 
-            var orderType = OrderType.Normal;
-            if (!string.IsNullOrEmpty(dto.Type) && Enum.TryParse<OrderType>(dto.Type, true, out var parsedType))
+            // Without a device token the order would be unreachable afterwards: the guest has no
+            // account to look it up under, so the Orders tab would silently never show it.
+            if (isGuest && string.IsNullOrWhiteSpace(deviceToken))
             {
-                orderType = parsedType;
+                throw new AppException(ErrorCodes.GuestDeviceTokenRequired);
             }
+
+            // The booked trip schedule slot. Validated here rather than trusted from the
+            // client: the slot list the app rendered may be minutes old, and in that time the
+            // window can have been deactivated, started, or filled by someone else.
+            var window = await ResolveScheduledWindowAsync(dto);
 
             // Stamp the fee at order time from the admin-managed settings, so a price change
             // between ordering and collection cannot charge the customer more than they were
             // quoted. The client's DeliveryAmount is ignored - it is not authoritative.
             var settings = await _appSettingsRepository.GetAsync();
-            var deliveryAmount = orderType == OrderType.Express
-                ? settings.ExpressDeliveryPrice
-                : settings.NormalDeliveryPrice;
+            var deliveryAmount = settings.NormalDeliveryPrice;
 
             var order = new Order
             {
@@ -69,13 +84,25 @@ namespace Ghasele.Application.Services
                 // Only stored for guests; a signed-in order carries the number on the user row,
                 // and duplicating it here would let the two drift apart.
                 ContactPhoneNumber = isGuest ? contactPhoneNumber : null,
+                // Likewise guest-only: it is how the app finds these orders again, and a
+                // signed-in customer is expected to see their orders on any device.
+                DeviceToken = isGuest ? deviceToken : null,
+                // Guest-only as well: a signed-in order pushes to the token on the user row,
+                // which is kept current by the app on every sign-in and token refresh.
+                FcmToken = isGuest ? dto.FcmToken?.Trim() : null,
                 TotalAmount = dto.TotalAmount,
                 NetAmount = dto.NetAmount,
                 DeliveryAmount = deliveryAmount,
                 CleanerAmount = dto.CleanerAmount,
                 ReferenceNumber = $"GH-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N").Substring(0, 4).ToUpper()}",
                 Status = OrderStatus.PendingCollection,
-                Type = orderType,
+                // Always Normal now. The enum survives for orders placed when Express existed.
+                Type = OrderType.Normal,
+                DeliveryWindowId = window.Id,
+                ScheduledDate = dto.ScheduledDate!.Value,
+                // Copied, not derived - see Order.ScheduledStartTime for why.
+                ScheduledStartTime = window.StartTime,
+                ScheduledEndTime = window.EndTime,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -93,11 +120,83 @@ namespace Ghasele.Application.Services
             return MapToDto(order, _language.Language);
         }
 
+        /// <summary>
+        /// Resolves and validates the trip schedule slot the customer booked, returning the
+        /// window to stamp on the order.
+        /// </summary>
+        /// <remarks>
+        /// Every rejection here is a slot the app offered moments ago but that is no longer
+        /// bookable, so each gets its own message - "that time is now full" and "we no longer
+        /// run that window" need different things from the customer.
+        /// </remarks>
+        private async Task<DeliveryWindow> ResolveScheduledWindowAsync(CreateOrderDto dto)
+        {
+            if (dto.DeliveryWindowId == null || dto.ScheduledDate == null)
+            {
+                throw new AppException(ErrorCodes.OrderScheduleRequired);
+            }
+
+            var window = await _deliveryWindowRepository.GetByIdAsync(dto.DeliveryWindowId.Value)
+                         ?? throw new AppException(ErrorCodes.DeliveryWindowNotFound);
+
+            if (!window.IsActive)
+            {
+                throw new AppException(ErrorCodes.DeliveryWindowInactive);
+            }
+
+            // Rejects both past dates and a date whose window has already started today, on the
+            // operator's clock. This is also what stops a client inventing its own date: only a
+            // date the slots endpoint would have offered survives.
+            if (!JordanTime.IsUpcoming(dto.ScheduledDate.Value, window.StartTime))
+            {
+                throw new AppException(ErrorCodes.OrderScheduleNotBookable);
+            }
+
+            var booked = await _orderRepository.CountBookedAsync(window.Id, dto.ScheduledDate.Value);
+            if (booked >= window.Capacity)
+            {
+                throw new AppException(ErrorCodes.DeliveryWindowFull);
+            }
+
+            return window;
+        }
+
         public async Task<List<OrderDto>> GetUserOrdersAsync(Guid userId, int page = 1, int pageSize = 20)
         {
             var orders = await _orderRepository.GetByUserIdAsync(userId, page, pageSize);
             var itemTypes = await _itemTypeRepository.GetAllAsync();
             return orders.Select(o => MapToDto(o, _language.Language, itemTypes)).ToList();
+        }
+
+        public async Task<List<OrderDto>> GetGuestOrdersAsync(string deviceToken, int page = 1, int pageSize = 20)
+        {
+            var orders = await _orderRepository.GetByDeviceTokenAsync(deviceToken, page, pageSize);
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            return orders.Select(o => MapToDto(o, _language.Language, itemTypes)).ToList();
+        }
+
+        public async Task<int> UpdateGuestFcmTokenAsync(string deviceToken, string fcmToken)
+        {
+            return await _orderRepository.UpdateGuestFcmTokenAsync(deviceToken.Trim(), fcmToken.Trim());
+        }
+
+        /// <summary>
+        /// Claims the orders a guest placed on this device for the account they just signed in
+        /// with, so ordering before registering does not cost them their history.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately quiet when there is nothing to do: most sign-ins are on a device that
+        /// never placed a guest order, and a caller should not have to distinguish "no token
+        /// sent" from "nothing to claim" to know the sign-in went fine.
+        /// </remarks>
+        public async Task<int> ClaimGuestOrdersAsync(Guid userId, string? deviceToken)
+        {
+            if (string.IsNullOrWhiteSpace(deviceToken) || userId == Guid.Empty)
+            {
+                return 0;
+            }
+
+            return await _orderRepository.ClaimGuestOrdersAsync(deviceToken.Trim(), userId);
         }
 
         public async Task<List<OrderDto>> GetAllOrdersAsync(string? status = null, string? searchTerm = null)
@@ -132,6 +231,13 @@ namespace Ghasele.Application.Services
 
             // Need to calculate price based on ItemTypes
             var allItemTypes = await _itemTypeRepository.GetAllAsync();
+
+            // What we pay is negotiated per laundry, so pricing needs to know which one is
+            // handling this order. The trip carries that, and a trip is always assigned before a
+            // driver can itemise the pickup. An order priced with no cleaner assigned, or with a
+            // laundry whose rate card is empty, records no cleaner cost at all - see below.
+            var cleanerPrices = await GetCleanerRateCardAsync(order.TripId);
+
             decimal itemsTotal = 0;
             decimal costTotal = 0;
 
@@ -161,24 +267,29 @@ namespace Ghasele.Application.Services
                     t.TypeNameAr.Equals(itemDto.ItemType, StringComparison.OrdinalIgnoreCase));
                 if (itemType != null)
                 {
-                    decimal price = 0;
-                    decimal cost = 0;
-
-                    switch (serviceType)
+                    decimal price = serviceType switch
                     {
-                        case ServiceType.Cleaning:
-                            price = itemType.CleaningPrice;
-                            cost = itemType.CleaningCost;
-                            break;
-                        case ServiceType.Both:
-                            price = itemType.BothPrice;
-                            cost = itemType.BothCost;
-                            break;
-                        default: // Iron
-                            price = itemType.IronPrice;
-                            cost = itemType.IronCost;
-                            break;
+                        ServiceType.Cleaning => itemType.CleaningPrice,
+                        ServiceType.Both => itemType.BothPrice,
+                        _ => itemType.IronPrice
+                    };
+
+                    // What we pay comes only from the rate agreed with the laundry handling this
+                    // order. There is no per-item fallback: item types carry customer prices
+                    // alone, so an item with no agreed rate costs us nothing on paper until one
+                    // is entered on that laundry's rate card. The customer price above is never
+                    // touched by any of this - what we pay and what we charge move independently.
+                    decimal cost = 0;
+                    if (cleanerPrices != null && cleanerPrices.TryGetValue(itemType.Id, out var agreed))
+                    {
+                        cost = agreed.PriceFor(serviceType);
                     }
+
+                    // Frozen onto the line so that re-reading this order later shows what it was
+                    // priced at, not what the pricing tables happen to say today.
+                    orderItem.ItemTypeId = itemType.Id;
+                    orderItem.UnitPrice = price;
+                    orderItem.UnitCleanerPrice = cost;
 
                     itemsTotal += price * itemDto.Quantity;
                     costTotal += cost * itemDto.Quantity;
@@ -237,7 +348,58 @@ namespace Ghasele.Application.Services
 
             // Reload with all includes for the DTO
             var updatedOrder = await _orderRepository.GetByIdAsync(orderId);
+
+            // The driver has just itemised the pickup, so this is the first moment the customer
+            // can be told what the order actually costs. GetByIdForUpdateAsync deliberately skips
+            // the User include, which is why this runs on the reloaded order instead.
+            await NotifyOrderPricedAsync(updatedOrder!);
+
             return MapToDto(updatedOrder!, _language.Language, allItemTypes);
+        }
+
+        /// <summary>
+        /// The agreed rates of the laundry assigned to <paramref name="tripId"/>, keyed by item
+        /// type, or null when there is no trip, no cleaner on it, or nothing agreed with them.
+        /// </summary>
+        /// <remarks>
+        /// Null and empty mean the same thing to the caller - nothing is owed to a laundry we
+        /// have agreed no rates with - so there is no point distinguishing them.
+        /// </remarks>
+        private async Task<Dictionary<Guid, CleanerItemPrice>?> GetCleanerRateCardAsync(Guid? tripId)
+        {
+            if (tripId is not Guid id) return null;
+
+            var trip = await _tripRepository.GetByIdAsync(id);
+            if (trip?.CleanerId is not Guid cleanerId) return null;
+
+            var prices = await _cleanerItemPriceRepository.GetByCleanerAsync(cleanerId);
+            return prices.Count == 0 ? null : prices.ToDictionary(p => p.ItemTypeId);
+        }
+
+        // Tells the customer the price once the driver has itemised their pickup. A push failure
+        // must never roll back the priced order, hence the in-app record is written first and the
+        // FCM send is best-effort.
+        private async Task NotifyOrderPricedAsync(Order order)
+        {
+            // Two decimals with invariant digits: an Arabic device locale would otherwise render
+            // Eastern-Arabic numerals here, which is not how the apps show prices elsewhere.
+            var amount = order.TotalAmount.ToString("0.00", CultureInfo.InvariantCulture);
+            string title = "تحديث طلب";
+            string body = $"تم تجهيز طلبك {order.ReferenceNumber} بقيمة {amount} دينار.";
+
+            // The in-app list is keyed by user, so only a signed-in order gets a stored record.
+            // A guest has no account to read one from - the push is their whole notification.
+            if (order.UserId is Guid ownerId)
+            {
+                await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
+            }
+
+            // Guest orders push to the token captured at checkout; see Order.ResolvePushToken.
+            var pushToken = order.ResolvePushToken();
+            if (!string.IsNullOrEmpty(pushToken))
+            {
+                await _notificationService.SendNotificationAsync(pushToken, title, body);
+            }
         }
 
         public async Task<OrderDto> UpdateOrderAsync(Guid id, UpdateOrderDto dto)
@@ -307,6 +469,11 @@ namespace Ghasele.Application.Services
                 ReferenceNumber = order.ReferenceNumber,
                 Status = order.Status.ToString(),
                 Type = order.Type.ToString(),
+                DeliveryWindowId = order.DeliveryWindowId,
+                ScheduledDate = order.ScheduledDate,
+                // The times agreed with the customer, not the window's current values.
+                ScheduledStart = order.ScheduledStartTime?.ToString("HH:mm"),
+                ScheduledEnd = order.ScheduledEndTime?.ToString("HH:mm"),
                 CreatedAt = order.CreatedAt,
                 TripId = order.TripId,
                 TripReferenceNumber = order.Trip?.ReferenceNumber,
@@ -332,7 +499,13 @@ namespace Ghasele.Application.Services
                     Id = i.Id,
                     ItemType = ResolveItemTypeName(i.ItemType, itemTypes, language),
                     ServiceType = i.ServiceType.ToString(),
-                    Quantity = i.Quantity
+                    Quantity = i.Quantity,
+                    // Read straight off the line, never recomputed from the current pricing
+                    // tables: these are what this order was actually priced at.
+                    UnitPrice = i.UnitPrice,
+                    UnitCleanerPrice = i.UnitCleanerPrice,
+                    LineTotal = i.UnitPrice * i.Quantity,
+                    LineCleanerAmount = i.UnitCleanerPrice * i.Quantity
                 }).ToList() ?? new List<OrderItemDto>()
             };
         }

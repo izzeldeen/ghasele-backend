@@ -85,6 +85,7 @@ namespace Ghasele.API.Controllers
         {
             System.Console.WriteLine($"[BACKEND] CompleteRegistration Request: Phone={request.PhoneNumber}, Name={request.FullName}");
             var response = await _authService.CompleteRegistrationAsync(request);
+            await ClaimGuestOrdersAsync(response);
             return Ok(response);
         }
 
@@ -93,6 +94,7 @@ namespace Ghasele.API.Controllers
         {
             System.Console.WriteLine($"[BACKEND] SignIn Request: Phone={request.PhoneNumber}");
             var response = await _authService.LoginAsync(request);
+            await ClaimGuestOrdersAsync(response);
             return Ok(response);
         }
 
@@ -100,6 +102,7 @@ namespace Ghasele.API.Controllers
         public async Task<IActionResult> AppleSignIn([FromBody] AppleSignInRequest request)
         {
             var response = await _authService.AppleSignInAsync(request);
+            await ClaimGuestOrdersAsync(response);
             return Ok(response);
         }
 

@@ -3,17 +3,20 @@ using System;
 using Ghasele.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Ghasele.Infrastructure.Migrations
+namespace Ghasele.Infrastructure.Migrations.PostgreSql
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260908153006_AddGuestTracking")]
+    partial class AddGuestTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -124,46 +127,6 @@ namespace Ghasele.Infrastructure.Migrations
                     b.ToTable("Cleaners");
                 });
 
-            modelBuilder.Entity("Ghasele.Domain.Entities.CleanerItemPrice", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("BothPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("CleanerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("CleaningPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("IronPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("ItemTypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemTypeId");
-
-                    b.HasIndex("CleanerId", "ItemTypeId")
-                        .IsUnique();
-
-                    b.ToTable("CleanerItemPrices");
-                });
-
             modelBuilder.Entity("Ghasele.Domain.Entities.DeliveryWindow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -266,11 +229,23 @@ namespace Ghasele.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("BothCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("BothPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal>("CleaningCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("CleaningPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("IronCost")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
@@ -299,8 +274,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-111111111111"),
+                            BothCost = 0.40m,
                             BothPrice = 1.00m,
+                            CleaningCost = 0.30m,
                             CleaningPrice = 0.75m,
+                            IronCost = 0.20m,
                             IronPrice = 0.50m,
                             IsDeleted = false,
                             TypeNameAr = "قميص",
@@ -309,8 +287,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-222222222222"),
+                            BothCost = 0.50m,
                             BothPrice = 1.25m,
+                            CleaningCost = 0.40m,
                             CleaningPrice = 1.00m,
+                            IronCost = 0.30m,
                             IronPrice = 0.75m,
                             IsDeleted = false,
                             TypeNameAr = "بنطلون",
@@ -319,8 +300,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-333333333333"),
+                            BothCost = 2.00m,
                             BothPrice = 5.00m,
+                            CleaningCost = 1.50m,
                             CleaningPrice = 3.50m,
+                            IronCost = 1.00m,
                             IronPrice = 2.50m,
                             IsDeleted = false,
                             TypeNameAr = "بدلة رجالية",
@@ -329,8 +313,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-444444444444"),
+                            BothCost = 5.00m,
                             BothPrice = 12.00m,
+                            CleaningCost = 3.00m,
                             CleaningPrice = 8.00m,
+                            IronCost = 1.50m,
                             IronPrice = 4.00m,
                             IsDeleted = false,
                             TypeNameAr = "فستان سهرة",
@@ -339,8 +326,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-555555555555"),
+                            BothCost = 1.00m,
                             BothPrice = 2.50m,
+                            CleaningCost = 0.80m,
                             CleaningPrice = 2.00m,
+                            IronCost = 0.60m,
                             IronPrice = 1.50m,
                             IsDeleted = false,
                             TypeNameAr = "جاكيت",
@@ -349,8 +339,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-666666666666"),
+                            BothCost = 2.50m,
                             BothPrice = 6.00m,
+                            CleaningCost = 2.50m,
                             CleaningPrice = 6.00m,
+                            IronCost = 0.00m,
                             IronPrice = 0.00m,
                             IsDeleted = false,
                             TypeNameAr = "لحاف/بطانية كبير",
@@ -359,8 +352,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-777777777777"),
+                            BothCost = 0.70m,
                             BothPrice = 1.75m,
+                            CleaningCost = 0.50m,
                             CleaningPrice = 1.25m,
+                            IronCost = 0.40m,
                             IronPrice = 1.00m,
                             IsDeleted = false,
                             TypeNameAr = "ثوب/دشداشة",
@@ -458,15 +454,8 @@ namespace Ghasele.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<Guid?>("DeliveryWindowId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("DeviceToken")
                         .HasColumnType("text");
-
-                    b.Property<string>("FcmToken")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsGuest")
                         .HasColumnType("boolean");
@@ -502,15 +491,6 @@ namespace Ghasele.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateOnly?>("ScheduledDate")
-                        .HasColumnType("date");
-
-                    b.Property<TimeOnly?>("ScheduledEndTime")
-                        .HasColumnType("time without time zone");
-
-                    b.Property<TimeOnly?>("ScheduledStartTime")
-                        .HasColumnType("time without time zone");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -540,8 +520,6 @@ namespace Ghasele.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("DeliveryWindowId", "ScheduledDate");
-
                     b.ToTable("Orders");
                 });
 
@@ -556,9 +534,6 @@ namespace Ghasele.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid?>("ItemTypeId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
 
@@ -568,14 +543,6 @@ namespace Ghasele.Infrastructure.Migrations
                     b.Property<string>("ServiceType")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<decimal>("UnitCleanerPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
 
                     b.HasKey("Id");
 
@@ -808,25 +775,6 @@ namespace Ghasele.Infrastructure.Migrations
                     b.ToTable("UserLocations");
                 });
 
-            modelBuilder.Entity("Ghasele.Domain.Entities.CleanerItemPrice", b =>
-                {
-                    b.HasOne("Ghasele.Domain.Entities.Cleaner", "Cleaner")
-                        .WithMany()
-                        .HasForeignKey("CleanerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Ghasele.Domain.Entities.ItemType", "ItemType")
-                        .WithMany()
-                        .HasForeignKey("ItemTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Cleaner");
-
-                    b.Navigation("ItemType");
-                });
-
             modelBuilder.Entity("Ghasele.Domain.Entities.Driver", b =>
                 {
                     b.HasOne("Ghasele.Domain.Entities.User", "User")
@@ -850,11 +798,6 @@ namespace Ghasele.Infrastructure.Migrations
 
             modelBuilder.Entity("Ghasele.Domain.Entities.Order", b =>
                 {
-                    b.HasOne("Ghasele.Domain.Entities.DeliveryWindow", "DeliveryWindow")
-                        .WithMany()
-                        .HasForeignKey("DeliveryWindowId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Ghasele.Domain.Entities.MarketingCode", "MarketingCode")
                         .WithMany()
                         .HasForeignKey("MarketingCodeId")
@@ -869,8 +812,6 @@ namespace Ghasele.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("DeliveryWindow");
 
                     b.Navigation("MarketingCode");
 

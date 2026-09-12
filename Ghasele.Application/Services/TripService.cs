@@ -133,17 +133,21 @@ namespace Ghasele.Application.Services
             // Notifications
             foreach (var order in trip.Orders)
             {
-                // A guest order has no user row and no device to notify, so it is skipped here.
-                // Matching on UserId as well makes the non-null owner explicit to the compiler.
-                if (order.User != null && order.UserId is Guid ownerId)
+                string title = "تحديث طلب";
+                string body = "السائق في الطريق لاستلام طلبك!";
+
+                // Only a signed-in order gets an in-app record - that list is keyed by user, and
+                // a guest has no account to read it from. They still get the push below.
+                if (order.UserId is Guid ownerId)
                 {
-                    string title = "تحديث طلب";
-                    string body = "السائق في الطريق لاستلام طلبك!";
                     await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
-                    if (!string.IsNullOrEmpty(order.User.FcmToken))
-                    {
-                        await _notificationService.SendNotificationAsync(order.User.FcmToken, title, body);
-                    }
+                }
+
+                // A guest order carries the device's push token itself; see Order.ResolvePushToken.
+                var pushToken = order.ResolvePushToken();
+                if (!string.IsNullOrEmpty(pushToken))
+                {
+                    await _notificationService.SendNotificationAsync(pushToken, title, body);
                 }
             }
 
@@ -213,16 +217,19 @@ namespace Ghasele.Application.Services
             // Side Effects
             if (status == OrderStatus.OutForDelivery)
             {
-                // Guest orders have no account to notify - see the collection notification above.
-                if (order.User != null && order.UserId is Guid ownerId)
+                string title = "تحديث طلب";
+                string body = "طلبك الآن في طريقه إليك!";
+
+                // In-app record for accounts only, push for everyone - as on collection above.
+                if (order.UserId is Guid ownerId)
                 {
-                    string title = "تحديث طلب";
-                    string body = "طلبك الآن في طريقه إليك!";
                     await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
-                    if (!string.IsNullOrEmpty(order.User.FcmToken))
-                    {
-                        await _notificationService.SendNotificationAsync(order.User.FcmToken, title, body);
-                    }
+                }
+
+                var pushToken = order.ResolvePushToken();
+                if (!string.IsNullOrEmpty(pushToken))
+                {
+                    await _notificationService.SendNotificationAsync(pushToken, title, body);
                 }
             }
             else if (status == OrderStatus.Delivered)

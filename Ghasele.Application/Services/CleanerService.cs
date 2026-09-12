@@ -14,11 +14,15 @@ namespace Ghasele.Application.Services
     public class CleanerService : ICleanerService
     {
         private readonly ICleanerRepository _cleanerRepository;
+        private readonly ICleanerItemPriceRepository _cleanerItemPriceRepository;
+        private readonly IItemTypeRepository _itemTypeRepository;
         private readonly ICurrentLanguageProvider _language;
 
-        public CleanerService(ICleanerRepository cleanerRepository, ICurrentLanguageProvider language)
+        public CleanerService(ICleanerRepository cleanerRepository, ICleanerItemPriceRepository cleanerItemPriceRepository, IItemTypeRepository itemTypeRepository, ICurrentLanguageProvider language)
         {
             _cleanerRepository = cleanerRepository;
+            _cleanerItemPriceRepository = cleanerItemPriceRepository;
+            _itemTypeRepository = itemTypeRepository;
             _language = language;
         }
 
@@ -70,6 +74,82 @@ namespace Ghasele.Application.Services
         public async Task DeleteCleanerAsync(Guid id)
         {
             await _cleanerRepository.DeleteAsync(id);
+        }
+
+        public async Task<List<CleanerItemPriceDto>> GetItemPricesAsync(Guid cleanerId)
+        {
+            var cleaner = await _cleanerRepository.GetByIdAsync(cleanerId);
+            if (cleaner == null) throw AppException.NotFound(ErrorCodes.CleanerNotFound);
+
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            var agreed = await _cleanerItemPriceRepository.GetByCleanerAsync(cleanerId);
+
+            // Driven by the item type list, not by the agreed rows: the screen has to offer a
+            // field for every item the business sells, including ones never negotiated with this
+            // cleaner, which is exactly where an admin needs to type a number.
+            return itemTypes.Select(itemType =>
+            {
+                var price = agreed.FirstOrDefault(p => p.ItemTypeId == itemType.Id);
+                return MapToItemPriceDto(itemType, price);
+            }).ToList();
+        }
+
+        public async Task<List<CleanerItemPriceDto>> SaveItemPricesAsync(Guid cleanerId, SaveCleanerItemPricesDto dto)
+        {
+            var cleaner = await _cleanerRepository.GetByIdAsync(cleanerId);
+            if (cleaner == null) throw AppException.NotFound(ErrorCodes.CleanerNotFound);
+
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            var knownItemTypeIds = itemTypes.Select(t => t.Id).ToHashSet();
+
+            foreach (var item in dto.Items)
+            {
+                if (!knownItemTypeIds.Contains(item.ItemTypeId))
+                {
+                    throw AppException.NotFound(ErrorCodes.ItemTypeNotFound);
+                }
+
+                if (item.IronPrice < 0 || item.CleaningPrice < 0 || item.BothPrice < 0)
+                {
+                    throw new AppException(ErrorCodes.CleanerItemPriceNegative);
+                }
+            }
+
+            // A row of three zeroes is the admin saying "nothing agreed here", which is the same
+            // thing as having no row at all - an item this laundry is simply not paid for.
+            // Storing the row would only add noise to the rate card.
+            var prices = dto.Items
+                .Where(i => i.IronPrice > 0 || i.CleaningPrice > 0 || i.BothPrice > 0)
+                .Select(i => new CleanerItemPrice
+                {
+                    CleanerId = cleanerId,
+                    ItemTypeId = i.ItemTypeId,
+                    IronPrice = i.IronPrice,
+                    CleaningPrice = i.CleaningPrice,
+                    BothPrice = i.BothPrice
+                })
+                .ToList();
+
+            await _cleanerItemPriceRepository.SaveForCleanerAsync(cleanerId, prices);
+            return await GetItemPricesAsync(cleanerId);
+        }
+
+        private CleanerItemPriceDto MapToItemPriceDto(ItemType itemType, CleanerItemPrice? price)
+        {
+            return new CleanerItemPriceDto
+            {
+                ItemTypeId = itemType.Id,
+                TypeNameAr = itemType.TypeNameAr,
+                TypeNameEn = itemType.TypeNameEn,
+                TypeName = BilingualText.Pick(itemType.TypeNameAr, itemType.TypeNameEn, _language.Language),
+                CustomerIronPrice = itemType.IronPrice,
+                CustomerCleaningPrice = itemType.CleaningPrice,
+                CustomerBothPrice = itemType.BothPrice,
+                IronPrice = price?.IronPrice ?? 0,
+                CleaningPrice = price?.CleaningPrice ?? 0,
+                BothPrice = price?.BothPrice ?? 0,
+                HasAgreedPrice = price != null
+            };
         }
 
         private CleanerDto MapToDto(Cleaner cleaner)

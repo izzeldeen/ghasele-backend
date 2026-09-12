@@ -29,11 +29,8 @@ namespace Ghasele.Application.Services
                 TypeNameAr = dto.TypeNameAr,
                 TypeNameEn = dto.TypeNameEn,
                 IronPrice = dto.IronPrice,
-                IronCost = dto.IronCost,
                 CleaningPrice = dto.CleaningPrice,
-                CleaningCost = dto.CleaningCost,
                 BothPrice = dto.BothPrice,
-                BothCost = dto.BothCost
             };
 
             await _repository.AddAsync(itemType);
@@ -55,11 +52,8 @@ namespace Ghasele.Application.Services
             item.TypeNameAr = dto.TypeNameAr;
             item.TypeNameEn = dto.TypeNameEn;
             item.IronPrice = dto.IronPrice;
-            item.IronCost = dto.IronCost;
             item.CleaningPrice = dto.CleaningPrice;
-            item.CleaningCost = dto.CleaningCost;
             item.BothPrice = dto.BothPrice;
-            item.BothCost = dto.BothCost;
 
             await _repository.UpdateAsync(item);
 
@@ -75,11 +69,8 @@ namespace Ghasele.Application.Services
                 TypeNameEn = item.TypeNameEn,
                 TypeName = BilingualText.Pick(item.TypeNameAr, item.TypeNameEn, _language.Language),
                 IronPrice = item.IronPrice,
-                IronCost = item.IronCost,
                 CleaningPrice = item.CleaningPrice,
-                CleaningCost = item.CleaningCost,
                 BothPrice = item.BothPrice,
-                BothCost = item.BothCost
             };
         }
 

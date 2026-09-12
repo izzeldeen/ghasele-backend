@@ -57,6 +57,12 @@ namespace Ghasele.API.Controllers
         }
 
         /// <summary>Active windows projected across the next N days (default 7, max 30).</summary>
+        /// <remarks>
+        /// Anonymous: a guest places orders too, and has to see the schedule before there is
+        /// any account to authenticate. It exposes only the operator's published opening
+        /// times and how full they are - nothing about any customer.
+        /// </remarks>
+        [AllowAnonymous]
         [HttpGet("slots")]
         public async Task<IActionResult> GetSlots([FromQuery] int days = 7)
         {

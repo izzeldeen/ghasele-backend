@@ -78,6 +78,46 @@ namespace Ghasele.API.Controllers
             }
         }
 
+        /// <summary>
+        /// This laundry's rate card: every item type with its customer prices and the rate agreed
+        /// with this laundry. Step two of configuring a cleaner.
+        /// </summary>
+        [HttpGet("{id}/item-prices")]
+        public async Task<IActionResult> GetCleanerItemPrices(Guid id)
+        {
+            try
+            {
+                var prices = await _cleanerService.GetItemPricesAsync(id);
+                return Ok(prices);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ErrorBody(ex));
+            }
+        }
+
+        /// <summary>
+        /// Replaces this laundry's agreed rates. Customer prices are untouched - those live on
+        /// the item type and are set on the Item Types screen.
+        /// </summary>
+        /// <remarks>
+        /// Changing a rate only affects orders priced after the change: an order stamps the rate
+        /// it was priced with onto its own lines at collection time.
+        /// </remarks>
+        [HttpPut("{id}/item-prices")]
+        public async Task<IActionResult> SaveCleanerItemPrices(Guid id, [FromBody] SaveCleanerItemPricesDto dto)
+        {
+            try
+            {
+                var prices = await _cleanerService.SaveItemPricesAsync(id, dto);
+                return Ok(prices);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ErrorBody(ex));
+            }
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCleaner(Guid id)
         {

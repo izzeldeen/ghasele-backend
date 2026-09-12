@@ -52,6 +52,15 @@ namespace Ghasele.Application.Localization
 
         /// <summary>A guest checkout arrived with no contact number.</summary>
         public const string GuestContactNumberRequired = "order.guest_contact_number_required";
+
+        /// <summary>
+        /// An anonymous request arrived with no device token, so there is nothing to file the
+        /// record under or look it up by later.
+        /// </summary>
+        public const string GuestDeviceTokenRequired = "guest.device_token_required";
+
+        /// <summary>A guest push-token refresh arrived with an empty token.</summary>
+        public const string GuestFcmTokenRequired = "guest.fcm_token_required";
         public const string OrderNotPartOfTrip = "order.not_part_of_trip";
         public const string OrderDeleted = "order.deleted";
         public const string OrderItemNotFound = "orderitem.not_found";
@@ -72,6 +81,11 @@ namespace Ghasele.Application.Localization
         // Cleaners
         public const string CleanerNotFound = "cleaner.not_found";
         public const string CleanerDeleted = "cleaner.deleted";
+
+        /// <summary>An agreed rate arrived below zero. We never pay a laundry a negative amount.</summary>
+        public const string CleanerItemPriceNegative = "cleaner.item_price_negative";
+
+        public const string CleanerItemPricesSaved = "cleaner.item_prices_saved";
 
         // Drivers
         public const string DriverNotFound = "driver.not_found";
@@ -96,9 +110,24 @@ namespace Ghasele.Application.Localization
         public const string DeliveryWindowInvalidRange = "delivery_window.invalid_range";
         public const string DeliveryWindowInvalidCapacity = "delivery_window.invalid_capacity";
 
+        /// <summary>The booked window has been switched off since the app listed it.</summary>
+        public const string DeliveryWindowInactive = "delivery_window.inactive";
+
+        /// <summary>The booked window has no capacity left on that date.</summary>
+        public const string DeliveryWindowFull = "delivery_window.full";
+
+        /// <summary>An order arrived without a trip schedule slot.</summary>
+        public const string OrderScheduleRequired = "order.schedule_required";
+
+        /// <summary>The chosen date/window pair is in the past, or has already started today.</summary>
+        public const string OrderScheduleNotBookable = "order.schedule_not_bookable";
+
         // Support tickets
         public const string TicketAttachmentTooLarge = "ticket.attachment_too_large";
         public const string TicketAttachmentInvalidType = "ticket.attachment_invalid_type";
+
+        /// <summary>A guest opened a ticket with no contact number.</summary>
+        public const string TicketContactNumberRequired = "ticket.guest_contact_number_required";
 
         // Maintenance
         public const string PurgeComplete = "maintenance.purge_complete";

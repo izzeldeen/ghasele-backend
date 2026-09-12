@@ -3,17 +3,20 @@ using System;
 using Ghasele.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Ghasele.Infrastructure.Migrations
+namespace Ghasele.Infrastructure.Migrations.PostgreSql
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912112900_AddCleanerItemPrices")]
+    partial class AddCleanerItemPrices
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -266,11 +269,23 @@ namespace Ghasele.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("BothCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("BothPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal>("CleaningCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("CleaningPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("IronCost")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
@@ -299,8 +314,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-111111111111"),
+                            BothCost = 0.40m,
                             BothPrice = 1.00m,
+                            CleaningCost = 0.30m,
                             CleaningPrice = 0.75m,
+                            IronCost = 0.20m,
                             IronPrice = 0.50m,
                             IsDeleted = false,
                             TypeNameAr = "قميص",
@@ -309,8 +327,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-222222222222"),
+                            BothCost = 0.50m,
                             BothPrice = 1.25m,
+                            CleaningCost = 0.40m,
                             CleaningPrice = 1.00m,
+                            IronCost = 0.30m,
                             IronPrice = 0.75m,
                             IsDeleted = false,
                             TypeNameAr = "بنطلون",
@@ -319,8 +340,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-333333333333"),
+                            BothCost = 2.00m,
                             BothPrice = 5.00m,
+                            CleaningCost = 1.50m,
                             CleaningPrice = 3.50m,
+                            IronCost = 1.00m,
                             IronPrice = 2.50m,
                             IsDeleted = false,
                             TypeNameAr = "بدلة رجالية",
@@ -329,8 +353,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-444444444444"),
+                            BothCost = 5.00m,
                             BothPrice = 12.00m,
+                            CleaningCost = 3.00m,
                             CleaningPrice = 8.00m,
+                            IronCost = 1.50m,
                             IronPrice = 4.00m,
                             IsDeleted = false,
                             TypeNameAr = "فستان سهرة",
@@ -339,8 +366,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-555555555555"),
+                            BothCost = 1.00m,
                             BothPrice = 2.50m,
+                            CleaningCost = 0.80m,
                             CleaningPrice = 2.00m,
+                            IronCost = 0.60m,
                             IronPrice = 1.50m,
                             IsDeleted = false,
                             TypeNameAr = "جاكيت",
@@ -349,8 +379,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-666666666666"),
+                            BothCost = 2.50m,
                             BothPrice = 6.00m,
+                            CleaningCost = 2.50m,
                             CleaningPrice = 6.00m,
+                            IronCost = 0.00m,
                             IronPrice = 0.00m,
                             IsDeleted = false,
                             TypeNameAr = "لحاف/بطانية كبير",
@@ -359,8 +392,11 @@ namespace Ghasele.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("f9e1e1e1-1234-4a5b-bcde-777777777777"),
+                            BothCost = 0.70m,
                             BothPrice = 1.75m,
+                            CleaningCost = 0.50m,
                             CleaningPrice = 1.25m,
+                            IronCost = 0.40m,
                             IronPrice = 1.00m,
                             IsDeleted = false,
                             TypeNameAr = "ثوب/دشداشة",

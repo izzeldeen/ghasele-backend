@@ -101,6 +101,7 @@ builder.Services.AddScoped<ITripService, TripService>();
 builder.Services.AddScoped<IItemTypeRepository, ItemTypeRepository>();
 builder.Services.AddScoped<IItemTypeService, ItemTypeService>();
 builder.Services.AddScoped<ICleanerRepository, CleanerRepository>();
+builder.Services.AddScoped<ICleanerItemPriceRepository, CleanerItemPriceRepository>();
 builder.Services.AddScoped<ICleanerService, CleanerService>();
 builder.Services.AddScoped<IUserLocationRepository, UserLocationRepository>();
 builder.Services.AddScoped<IUserLocationService, UserLocationService>();

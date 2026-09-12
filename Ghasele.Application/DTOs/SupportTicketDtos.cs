@@ -9,6 +9,12 @@ namespace Ghasele.Application.DTOs
         public string Message { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
         public string? Status { get; set; }
+
+        /// <summary>
+        /// Number to reach a guest on, E.164. Required when the request carries no bearer token;
+        /// ignored for a signed-in caller, whose number is on their user record.
+        /// </summary>
+        public string? ContactPhoneNumber { get; set; }
     }
 
     /// <summary>Metadata for a photo the customer attached to a new ticket.</summary>
@@ -23,7 +29,11 @@ namespace Ghasele.Application.DTOs
     public class TicketDto
     {
         public int Id { get; set; }
+        /// <summary>Empty for a guest ticket.</summary>
         public string UserId { get; set; } = string.Empty;
+
+        /// <summary>True when the ticket was opened without an account.</summary>
+        public bool IsGuest { get; set; }
         public string Subject { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;

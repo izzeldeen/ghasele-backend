@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System;
 using Ghasele.Application.DTOs;
+using Ghasele.Application.Localization;
 using Ghasele.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +13,7 @@ namespace Ghasele.API.Controllers
     [ApiController]
     [Route("api/support-tickets")]
     [Authorize]
-    public class SupportTicketController : ControllerBase
+    public class SupportTicketController : ApiControllerBase
     {
         private readonly ISupportTicketService _service;
 
@@ -24,15 +26,21 @@ namespace Ghasele.API.Controllers
         /// Opens a ticket. Accepts multipart/form-data so the customer app can attach
         /// a single photo; a plain form with no file works too.
         /// </summary>
+        [AllowAnonymous]
         [HttpPost]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(6 * 1024 * 1024)]
         public async Task<ActionResult<TicketDto>> CreateTicket([FromForm] CreateTicketDto dto, IFormFile? attachment)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? dto.UserId;
-            if (string.IsNullOrEmpty(userId))
+            // Only a bearer token makes the caller a signed-in user. dto.UserId is no longer
+            // trusted: this endpoint is now open to guests, and an anonymous caller passing
+            // someone else's id would otherwise file a ticket against their account.
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var deviceToken = DeviceToken();
+
+            if (string.IsNullOrEmpty(userId) && string.IsNullOrEmpty(deviceToken))
             {
-                return Unauthorized("User ID not found");
+                return BadRequest(new { errorCode = ErrorCodes.GuestDeviceTokenRequired, message = L(ErrorCodes.GuestDeviceTokenRequired) });
             }
 
             TicketAttachmentUpload? upload = null;
@@ -47,8 +55,36 @@ namespace Ghasele.API.Controllers
                 };
             }
 
-            var ticket = await _service.CreateTicketAsync(userId, dto, upload);
-            return Ok(ticket);
+            try
+            {
+                var ticket = await _service.CreateTicketAsync(userId, deviceToken, dto, upload);
+                return Ok(ticket);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ErrorBody(ex));
+            }
+        }
+
+        /// <summary>
+        /// Tickets opened from this device without an account, so a guest can read the reply.
+        /// </summary>
+        /// <remarks>
+        /// The device token is the whole credential. It only ever returns that device's own
+        /// guest tickets - never an account's - which is why it can be anonymous.
+        /// </remarks>
+        [AllowAnonymous]
+        [HttpGet("guest")]
+        public async Task<ActionResult<IEnumerable<TicketDto>>> GetGuestTickets()
+        {
+            var deviceToken = DeviceToken();
+            if (string.IsNullOrEmpty(deviceToken))
+            {
+                return BadRequest(new { errorCode = ErrorCodes.GuestDeviceTokenRequired, message = L(ErrorCodes.GuestDeviceTokenRequired) });
+            }
+
+            var tickets = await _service.GetGuestTicketsAsync(deviceToken);
+            return Ok(tickets);
         }
 
         [HttpGet]

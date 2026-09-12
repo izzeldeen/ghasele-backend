@@ -58,7 +58,11 @@ namespace Ghasele.Infrastructure.Repositories
                 .Include(t => t.Cleaner)
                 .Include(t => t.Driver)
                 .Where(t => t.AssignedDriverId == driverId)
-                .OrderByDescending(t => t.CreatedAt)
+                // Work-queue order, not newest-first: the trip the captain already started
+                // stays pinned at the top, then the rest oldest-first so the longest-waiting
+                // customers are served next. The admin list (GetAllAsync) keeps newest-first.
+                .OrderBy(t => t.StartedAt == null)
+                .ThenBy(t => t.CreatedAt)
                 .ToListAsync();
         }
 

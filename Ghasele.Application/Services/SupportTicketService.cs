@@ -54,8 +54,27 @@ namespace Ghasele.Application.Services
             return Array.IndexOf(AllowedExtensions, extension) >= 0;
         }
 
-        public async Task<TicketDto> CreateTicketAsync(string userId, CreateTicketDto dto, TicketAttachmentUpload? attachment = null)
+        public async Task<TicketDto> CreateTicketAsync(string? userId, string? deviceToken, CreateTicketDto dto, TicketAttachmentUpload? attachment = null)
         {
+            var isGuest = string.IsNullOrWhiteSpace(userId);
+            var contactPhoneNumber = dto.ContactPhoneNumber?.Trim();
+            deviceToken = deviceToken?.Trim();
+
+            if (isGuest)
+            {
+                // A guest ticket has no user row behind it, so these two are the only ways to
+                // answer the customer: the number to reach them, and the device token that lets
+                // the app show them the reply.
+                if (string.IsNullOrWhiteSpace(contactPhoneNumber))
+                {
+                    throw new AppException(ErrorCodes.TicketContactNumberRequired);
+                }
+                if (string.IsNullOrWhiteSpace(deviceToken))
+                {
+                    throw new AppException(ErrorCodes.GuestDeviceTokenRequired);
+                }
+            }
+
             string? attachmentUrl = null;
             if (attachment != null && attachment.Length > 0)
             {
@@ -73,7 +92,11 @@ namespace Ghasele.Application.Services
 
             var ticket = new SupportTicket
             {
-                UserId = userId,
+                UserId = isGuest ? null : userId,
+                // Guest-only, mirroring orders: a signed-in customer is found by their account,
+                // and storing a device against them would tie their tickets to one phone.
+                DeviceToken = isGuest ? deviceToken : null,
+                ContactPhoneNumber = isGuest ? contactPhoneNumber : null,
                 Subject = dto.Subject,
                 Message = dto.Message,
                 Category = dto.Category,
@@ -83,15 +106,31 @@ namespace Ghasele.Application.Services
             };
 
             var createdTicket = await _repository.CreateAsync(ticket);
-            var user = await _userRepository.GetByIdAsync(Guid.Parse(userId));
-            return MapToDto(createdTicket, user);
+            return MapToDto(createdTicket, await LoadUserAsync(ticket.UserId));
         }
 
         public async Task<IEnumerable<TicketDto>> GetUserTicketsAsync(string userId)
         {
             var tickets = await _repository.GetByUserIdAsync(userId);
-            var user = await _userRepository.GetByIdAsync(Guid.Parse(userId));
+            var user = await LoadUserAsync(userId);
             return tickets.Select(t => MapToDto(t, user));
+        }
+
+        public async Task<IEnumerable<TicketDto>> GetGuestTicketsAsync(string deviceToken)
+        {
+            var tickets = await _repository.GetByDeviceTokenAsync(deviceToken);
+            // No user to join to - a guest ticket carries its own contact number instead.
+            return tickets.Select(t => MapToDto(t, null));
+        }
+
+        /// <summary>
+        /// Loads the ticket's owner, or null for a guest ticket. Ids that are not parseable as a
+        /// Guid are treated as absent rather than throwing: the column is free text, and one bad
+        /// row must not take down the whole listing.
+        /// </summary>
+        private async Task<User?> LoadUserAsync(string? userId)
+        {
+            return Guid.TryParse(userId, out var id) ? await _userRepository.GetByIdAsync(id) : null;
         }
 
         public async Task<TicketDto?> GetTicketByIdAsync(int id)
@@ -99,7 +138,7 @@ namespace Ghasele.Application.Services
             var ticket = await _repository.GetByIdAsync(id);
             if (ticket == null) return null;
             
-            var user = await _userRepository.GetByIdAsync(Guid.Parse(ticket.UserId));
+            var user = await LoadUserAsync(ticket.UserId);
             return MapToDto(ticket, user);
         }
 
@@ -114,7 +153,7 @@ namespace Ghasele.Application.Services
 
             await _repository.UpdateAsync(ticket);
             
-            var user = await _userRepository.GetByIdAsync(Guid.Parse(ticket.UserId));
+            var user = await LoadUserAsync(ticket.UserId);
             return MapToDto(ticket, user);
         }
 
@@ -126,7 +165,9 @@ namespace Ghasele.Application.Services
 
             return tickets.Select(t => 
             {
-                userDict.TryGetValue(t.UserId, out var user);
+                // Guest tickets have no owner, and a null key would throw here.
+                User? user = null;
+                if (t.UserId != null) userDict.TryGetValue(t.UserId, out user);
                 return MapToDto(t, user);
             });
         }
@@ -136,7 +177,8 @@ namespace Ghasele.Application.Services
             return new TicketDto
             {
                 Id = ticket.Id,
-                UserId = ticket.UserId,
+                UserId = ticket.UserId ?? string.Empty,
+                IsGuest = ticket.UserId == null,
                 Subject = ticket.Subject,
                 Message = ticket.Message,
                 Category = ticket.Category,
@@ -146,7 +188,9 @@ namespace Ghasele.Application.Services
                 CreatedAt = ticket.CreatedAt,
                 UpdatedAt = ticket.UpdatedAt,
                 UserName = user?.FullName,
-                UserPhoneNumber = user?.PhoneNumber
+                // Falls back to the number the guest typed, so the admin screen has someone to
+                // call either way rather than an empty column on half the tickets.
+                UserPhoneNumber = user?.PhoneNumber ?? ticket.ContactPhoneNumber
             };
         }
     }

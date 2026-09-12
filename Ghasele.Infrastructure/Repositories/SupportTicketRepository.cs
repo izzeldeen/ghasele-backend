@@ -32,6 +32,18 @@ namespace Ghasele.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// Guest tickets from one device. Restricted to rows with no owner so a ticket that
+        /// belongs to an account can never be read back through a device token.
+        /// </summary>
+        public async Task<IEnumerable<SupportTicket>> GetByDeviceTokenAsync(string deviceToken)
+        {
+            return await _context.SupportTickets
+                .Where(t => t.UserId == null && t.DeviceToken == deviceToken)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+        }
+
         public async Task<SupportTicket?> GetByIdAsync(int id)
         {
             return await _context.SupportTickets.FindAsync(id);

@@ -52,6 +52,7 @@ namespace Ghasele.API.Controllers
             }
 
             var response = await _authService.FirebaseLoginAsync(request);
+            await ClaimGuestOrdersAsync(response);
             return Ok(response);
         }
 
@@ -78,6 +79,7 @@ namespace Ghasele.API.Controllers
             }
 
             var response = await _authService.GoogleLoginAsync(request);
+            await ClaimGuestOrdersAsync(response);
             return Ok(response);
         }
 
@@ -105,6 +107,7 @@ namespace Ghasele.API.Controllers
             }
 
             var response = await _authService.FirebaseCompleteRegistrationAsync(request);
+            await ClaimGuestOrdersAsync(response);
             return Ok(response);
         }
     }

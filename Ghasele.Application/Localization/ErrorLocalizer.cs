@@ -47,6 +47,8 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.OrderNotFound] = "Order not found.",
             [ErrorCodes.OrderPendingExists] = "You already have a pending order. Please wait for it to be processed.",
             [ErrorCodes.GuestContactNumberRequired] = "Please enter a contact number so the driver can reach you.",
+            [ErrorCodes.GuestDeviceTokenRequired] = "Please update the app to continue without an account.",
+            [ErrorCodes.GuestFcmTokenRequired] = "A notification token is required.",
             [ErrorCodes.OrderNotPartOfTrip] = "This order is not part of a trip.",
             [ErrorCodes.OrderDeleted] = "Order deleted successfully.",
             [ErrorCodes.OrderItemNotFound] = "Order item not found.",
@@ -63,6 +65,8 @@ namespace Ghasele.Application.Localization
 
             [ErrorCodes.CleanerNotFound] = "Laundry not found.",
             [ErrorCodes.CleanerDeleted] = "Laundry deleted successfully.",
+            [ErrorCodes.CleanerItemPriceNegative] = "Agreed prices cannot be negative.",
+            [ErrorCodes.CleanerItemPricesSaved] = "Agreed prices saved successfully.",
 
             [ErrorCodes.DriverNotFound] = "Driver not found.",
             [ErrorCodes.DriverDeleted] = "Driver deleted successfully.",
@@ -79,9 +83,14 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.DeliveryWindowNotFound] = "Delivery window not found.",
             [ErrorCodes.DeliveryWindowInvalidRange] = "The end time must be after the start time.",
             [ErrorCodes.DeliveryWindowInvalidCapacity] = "Capacity must be at least 1.",
+            [ErrorCodes.DeliveryWindowInactive] = "That collection time is no longer available. Please choose another.",
+            [ErrorCodes.DeliveryWindowFull] = "That collection time is fully booked. Please choose another.",
+            [ErrorCodes.OrderScheduleRequired] = "Please choose a collection time for your order.",
+            [ErrorCodes.OrderScheduleNotBookable] = "That collection time has already passed. Please choose another.",
 
             [ErrorCodes.TicketAttachmentTooLarge] = "The photo is too large. Please attach an image under 5 MB.",
             [ErrorCodes.TicketAttachmentInvalidType] = "Only image files can be attached.",
+            [ErrorCodes.TicketContactNumberRequired] = "Please enter a contact number so support can reach you.",
 
             [ErrorCodes.PurgeComplete] = "Purge complete.",
             [ErrorCodes.PurgeFailed] = "Purge failed and was rolled back.",
@@ -122,6 +131,8 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.OrderNotFound] = "لم يتم العثور على الطلب.",
             [ErrorCodes.OrderPendingExists] = "لديك طلب قيد الانتظار بالفعل. يرجى انتظار معالجته.",
             [ErrorCodes.GuestContactNumberRequired] = "يرجى إدخال رقم للتواصل ليتمكن السائق من الوصول إليك.",
+            [ErrorCodes.GuestDeviceTokenRequired] = "يرجى تحديث التطبيق للمتابعة بدون حساب.",
+            [ErrorCodes.GuestFcmTokenRequired] = "رمز الإشعارات مطلوب.",
             [ErrorCodes.OrderNotPartOfTrip] = "هذا الطلب غير مرتبط بأي رحلة.",
             [ErrorCodes.OrderDeleted] = "تم حذف الطلب بنجاح.",
             [ErrorCodes.OrderItemNotFound] = "لم يتم العثور على عنصر الطلب.",
@@ -138,6 +149,8 @@ namespace Ghasele.Application.Localization
 
             [ErrorCodes.CleanerNotFound] = "لم يتم العثور على المغسلة.",
             [ErrorCodes.CleanerDeleted] = "تم حذف المغسلة بنجاح.",
+            [ErrorCodes.CleanerItemPriceNegative] = "لا يمكن أن تكون الأسعار المتفق عليها بالسالب.",
+            [ErrorCodes.CleanerItemPricesSaved] = "تم حفظ الأسعار المتفق عليها بنجاح.",
 
             [ErrorCodes.DriverNotFound] = "لم يتم العثور على السائق.",
             [ErrorCodes.DriverDeleted] = "تم حذف السائق بنجاح.",
@@ -154,9 +167,14 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.DeliveryWindowNotFound] = "لم يتم العثور على فترة التوصيل.",
             [ErrorCodes.DeliveryWindowInvalidRange] = "يجب أن يكون وقت النهاية بعد وقت البداية.",
             [ErrorCodes.DeliveryWindowInvalidCapacity] = "يجب أن تكون السعة 1 على الأقل.",
+            [ErrorCodes.DeliveryWindowInactive] = "موعد الاستلام هذا لم يعد متاحاً. يرجى اختيار موعد آخر.",
+            [ErrorCodes.DeliveryWindowFull] = "موعد الاستلام هذا محجوز بالكامل. يرجى اختيار موعد آخر.",
+            [ErrorCodes.OrderScheduleRequired] = "يرجى اختيار موعد استلام لطلبك.",
+            [ErrorCodes.OrderScheduleNotBookable] = "موعد الاستلام هذا قد فات. يرجى اختيار موعد آخر.",
 
             [ErrorCodes.TicketAttachmentTooLarge] = "حجم الصورة كبير جداً. يرجى إرفاق صورة أقل من 5 ميجابايت.",
             [ErrorCodes.TicketAttachmentInvalidType] = "يمكن إرفاق ملفات الصور فقط.",
+            [ErrorCodes.TicketContactNumberRequired] = "يرجى إدخال رقم للتواصل ليتمكن فريق الدعم من الوصول إليك.",
 
             [ErrorCodes.PurgeComplete] = "تمت عملية التنظيف بنجاح.",
             [ErrorCodes.PurgeFailed] = "فشلت عملية التنظيف وتم التراجع عنها.",

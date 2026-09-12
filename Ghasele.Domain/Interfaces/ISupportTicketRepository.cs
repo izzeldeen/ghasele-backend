@@ -8,6 +8,7 @@ namespace Ghasele.Domain.Interfaces
     {
         Task<SupportTicket> CreateAsync(SupportTicket ticket);
         Task<IEnumerable<SupportTicket>> GetByUserIdAsync(string userId);
+        Task<IEnumerable<SupportTicket>> GetByDeviceTokenAsync(string deviceToken);
         Task<SupportTicket?> GetByIdAsync(int id);
         Task UpdateAsync(SupportTicket ticket);
         Task<IEnumerable<SupportTicket>> GetAllAsync();

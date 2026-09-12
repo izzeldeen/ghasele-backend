@@ -18,6 +18,7 @@ namespace Ghasele.Infrastructure.Data
         public DbSet<Trip> Trips { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<ItemType> ItemTypes { get; set; }
+        public DbSet<CleanerItemPrice> CleanerItemPrices { get; set; }
         public DbSet<UserLocation> UserLocations { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -65,6 +66,13 @@ namespace Ghasele.Infrastructure.Data
                 entity.Property(e => e.Status).HasConversion<string>();
                 entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(20);
 
+                // Every guest opening the Orders tab filters on this, so it needs to be an
+                // index lookup rather than a scan of the whole Orders table.
+                entity.HasIndex(e => e.DeviceToken);
+
+                // Same 500 as Users.FcmToken - it holds the same kind of value.
+                entity.Property(e => e.FcmToken).HasMaxLength(500);
+
                 // UserId is optional so a guest order can exist with no user row. Cascade stays
                 // explicit: deleting an account still removes its orders, which the account
                 // deletion flow relies on. Guest orders have no owner to cascade from.
@@ -78,6 +86,20 @@ namespace Ghasele.Infrastructure.Data
                       .WithMany(t => t.Orders)
                       .HasForeignKey(o => o.TripId)
                       .OnDelete(DeleteBehavior.SetNull);
+
+                // Restrict, not SetNull or Cascade: a booked order must keep pointing at the
+                // window it was scheduled into. Deleting a window with orders on it should
+                // fail loudly rather than silently unschedule them - the operator can
+                // deactivate it instead, which hides it from new bookings and keeps history.
+                entity.HasOne(o => o.DeliveryWindow)
+                      .WithMany()
+                      .HasForeignKey(o => o.DeliveryWindowId)
+                      .IsRequired(false)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                // The customer app asks "what is booked from today onwards" on every slot
+                // fetch, and dispatch groups the day's orders by window.
+                entity.HasIndex(e => new { e.DeliveryWindowId, e.ScheduledDate });
             });
 
             modelBuilder.Entity<Trip>(entity =>
@@ -122,11 +144,8 @@ namespace Ghasele.Infrastructure.Data
                 entity.Property(e => e.TypeNameAr).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.TypeNameEn).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.IronPrice).HasPrecision(18, 2);
-                entity.Property(e => e.IronCost).HasPrecision(18, 2);
                 entity.Property(e => e.CleaningPrice).HasPrecision(18, 2);
-                entity.Property(e => e.CleaningCost).HasPrecision(18, 2);
                 entity.Property(e => e.BothPrice).HasPrecision(18, 2);
-                entity.Property(e => e.BothCost).HasPrecision(18, 2);
 
                 entity.HasData(
                     new ItemType
@@ -135,11 +154,8 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameAr = "قميص",
                         TypeNameEn = "Shirt",
                         IronPrice = 0.50m,
-                        IronCost = 0.20m,
                         CleaningPrice = 0.75m,
-                        CleaningCost = 0.30m,
                         BothPrice = 1.00m,
-                        BothCost = 0.40m,
                         IsDeleted = false
                     },
                     new ItemType
@@ -148,11 +164,8 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameAr = "بنطلون",
                         TypeNameEn = "Trousers",
                         IronPrice = 0.75m,
-                        IronCost = 0.30m,
                         CleaningPrice = 1.00m,
-                        CleaningCost = 0.40m,
                         BothPrice = 1.25m,
-                        BothCost = 0.50m,
                         IsDeleted = false
                     },
                     new ItemType
@@ -161,11 +174,8 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameAr = "بدلة رجالية",
                         TypeNameEn = "Men's Suit",
                         IronPrice = 2.50m,
-                        IronCost = 1.00m,
                         CleaningPrice = 3.50m,
-                        CleaningCost = 1.50m,
                         BothPrice = 5.00m,
-                        BothCost = 2.00m,
                         IsDeleted = false
                     },
                     new ItemType
@@ -174,11 +184,8 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameAr = "فستان سهرة",
                         TypeNameEn = "Evening Dress",
                         IronPrice = 4.00m,
-                        IronCost = 1.50m,
                         CleaningPrice = 8.00m,
-                        CleaningCost = 3.00m,
                         BothPrice = 12.00m,
-                        BothCost = 5.00m,
                         IsDeleted = false
                     },
                     new ItemType
@@ -187,11 +194,8 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameAr = "جاكيت",
                         TypeNameEn = "Jacket",
                         IronPrice = 1.50m,
-                        IronCost = 0.60m,
                         CleaningPrice = 2.00m,
-                        CleaningCost = 0.80m,
                         BothPrice = 2.50m,
-                        BothCost = 1.00m,
                         IsDeleted = false
                     },
                     new ItemType
@@ -200,11 +204,8 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameAr = "لحاف/بطانية كبير",
                         TypeNameEn = "Large Blanket",
                         IronPrice = 0.00m,
-                        IronCost = 0.00m,
                         CleaningPrice = 6.00m,
-                        CleaningCost = 2.50m,
                         BothPrice = 6.00m,
-                        BothCost = 2.50m,
                         IsDeleted = false
                     },
                     new ItemType
@@ -213,11 +214,8 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameAr = "ثوب/دشداشة",
                         TypeNameEn = "Thobe",
                         IronPrice = 1.00m,
-                        IronCost = 0.40m,
                         CleaningPrice = 1.25m,
-                        CleaningCost = 0.50m,
                         BothPrice = 1.75m,
-                        BothCost = 0.70m,
                         IsDeleted = false
                     }
                 );
@@ -295,6 +293,46 @@ namespace Ghasele.Infrastructure.Data
 
                 entity.Property(e => e.MarketingDiscount).HasPrecision(18, 2);
                 entity.Property(e => e.MarketerShare).HasPrecision(18, 2);
+            });
+
+            modelBuilder.Entity<SupportTicket>(entity =>
+            {
+                // Same reason as Orders.DeviceToken: it is how a guest finds their own tickets.
+                entity.HasIndex(e => e.DeviceToken);
+            });
+
+            modelBuilder.Entity<CleanerItemPrice>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.IronPrice).HasPrecision(18, 2);
+                entity.Property(e => e.CleaningPrice).HasPrecision(18, 2);
+                entity.Property(e => e.BothPrice).HasPrecision(18, 2);
+
+                // One agreed rate per item type per cleaner. Enforced in the database as well as
+                // the save path: two rows for the same pair would make "what do we pay for a
+                // shirt here" ambiguous, and pricing would silently pick whichever came first.
+                entity.HasIndex(e => new { e.CleanerId, e.ItemTypeId }).IsUnique();
+
+                // Removing a laundry takes its rate card with it - the rates mean nothing
+                // without the cleaner, and orders already priced keep their own copy.
+                entity.HasOne(e => e.Cleaner)
+                      .WithMany()
+                      .HasForeignKey(e => e.CleanerId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Item types are soft-deleted (ItemType.IsDeleted), so this never fires in
+                // practice; Cascade keeps the table consistent if one is ever hard-deleted.
+                entity.HasOne(e => e.ItemType)
+                      .WithMany()
+                      .HasForeignKey(e => e.ItemTypeId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<OrderItem>(entity =>
+            {
+                // The two figures the line was priced with, frozen at collection time.
+                entity.Property(e => e.UnitPrice).HasPrecision(18, 2);
+                entity.Property(e => e.UnitCleanerPrice).HasPrecision(18, 2);
             });
 
             modelBuilder.Entity<DeliveryWindow>(entity =>

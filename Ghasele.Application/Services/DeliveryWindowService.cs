@@ -7,6 +7,7 @@ using Ghasele.Application.DTOs;
 using Ghasele.Application.Exceptions;
 using Ghasele.Application.Interfaces;
 using Ghasele.Application.Localization;
+using Ghasele.Application.Scheduling;
 using Ghasele.Domain.Entities;
 using Ghasele.Domain.Interfaces;
 
@@ -15,10 +16,12 @@ namespace Ghasele.Application.Services
     public class DeliveryWindowService : IDeliveryWindowService
     {
         private readonly IDeliveryWindowRepository _repository;
+        private readonly IOrderRepository _orderRepository;
 
-        public DeliveryWindowService(IDeliveryWindowRepository repository)
+        public DeliveryWindowService(IDeliveryWindowRepository repository, IOrderRepository orderRepository)
         {
             _repository = repository;
+            _orderRepository = orderRepository;
         }
 
         public async Task<List<DeliveryWindowDto>> GetAllAsync()
@@ -78,7 +81,11 @@ namespace Ghasele.Application.Services
             if (days > 30) days = 30;
 
             var windows = await _repository.GetActiveAsync();
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            // Amman's day, not UTC's. Between 21:00 and midnight local the two disagree, and
+            // using UTC there would offer this morning's windows as if they were still ahead.
+            var today = JordanTime.Today;
+            var booked = await _orderRepository.GetBookedCountsAsync(today);
 
             var slots = new List<DeliverySlotDto>();
             for (var d = 0; d < days; d++)
@@ -86,13 +93,21 @@ namespace Ghasele.Application.Services
                 var date = today.AddDays(d);
                 foreach (var w in windows)
                 {
+                    // Today's earlier windows have already been driven; offering one would
+                    // promise a collection that cannot happen.
+                    if (!JordanTime.IsUpcoming(date, w.StartTime)) continue;
+
+                    booked.TryGetValue((w.Id, date), out var count);
+
                     slots.Add(new DeliverySlotDto
                     {
                         WindowId = w.Id,
                         Date = date,
                         Start = w.StartTime.ToString("HH:mm"),
                         End = w.EndTime.ToString("HH:mm"),
-                        Capacity = w.Capacity
+                        Capacity = w.Capacity,
+                        Booked = count,
+                        Remaining = Math.Max(0, w.Capacity - count)
                     });
                 }
             }
