@@ -31,11 +31,26 @@ namespace Ghasele.Application.Services
                 IronPrice = dto.IronPrice,
                 CleaningPrice = dto.CleaningPrice,
                 BothPrice = dto.BothPrice,
+                SortOrder = dto.SortOrder ?? await NextSortOrderAsync(),
             };
 
             await _repository.AddAsync(itemType);
 
             return MapToDto(itemType);
+        }
+
+        /// <summary>
+        /// One past the last item in the catalogue, so an item added without a position
+        /// lands at the end.
+        /// </summary>
+        /// <remarks>
+        /// Defaulting to 0 instead would drop every new item straight to the top of the
+        /// customer's pricing page, which is the opposite of what adding one usually means.
+        /// </remarks>
+        private async Task<int> NextSortOrderAsync()
+        {
+            var existing = await _repository.GetAllAsync();
+            return existing.Count == 0 ? 0 : existing.Max(i => i.SortOrder) + 1;
         }
 
         public async Task<List<ItemTypeDto>> GetAllItemTypesAsync()
@@ -54,6 +69,9 @@ namespace Ghasele.Application.Services
             item.IronPrice = dto.IronPrice;
             item.CleaningPrice = dto.CleaningPrice;
             item.BothPrice = dto.BothPrice;
+            // Left where it is when the caller says nothing, so an edit that only touches
+            // prices cannot quietly move the item on the customer's pricing page.
+            if (dto.SortOrder.HasValue) item.SortOrder = dto.SortOrder.Value;
 
             await _repository.UpdateAsync(item);
 
@@ -71,6 +89,7 @@ namespace Ghasele.Application.Services
                 IronPrice = item.IronPrice,
                 CleaningPrice = item.CleaningPrice,
                 BothPrice = item.BothPrice,
+                SortOrder = item.SortOrder,
             };
         }
 

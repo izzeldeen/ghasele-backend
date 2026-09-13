@@ -125,7 +125,7 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString(), user.IsAdmin);
         }
 
         public async Task<AuthResponse> AppleSignInAsync(AppleSignInRequest request)
@@ -179,7 +179,7 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString(), user.IsAdmin);
         }
 
         /// <summary>
@@ -238,7 +238,7 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString(), user.IsAdmin);
         }
 
         /// <summary>
@@ -342,7 +342,7 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString(), user.IsAdmin);
         }
         /// Signs a user in from a client-side Google sign-in result.
         /// </summary>
@@ -399,7 +399,7 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString(), user.IsAdmin);
         }
 
         // Verifies the identity token is a genuine, unexpired Apple token issued for
@@ -523,7 +523,7 @@ namespace Ghasele.Application.Services
 
             var token = GenerateJwtToken(user);
 
-            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString());
+            return new AuthResponse(token, user.Id, user.Username, user.Email, user.FullName, user.PhoneNumber, user.IsPhoneVerified, user.Role.ToString(), user.IsAdmin);
         }
 
         public async Task ResendRegistrationOtpAsync(string phoneNumber)
@@ -654,19 +654,32 @@ namespace Ghasele.Application.Services
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var claimList = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim("username", user.Username),
                 new Claim(ClaimTypes.Role, user.Role.ToString())
             };
 
+            // A second role claim rather than a bespoke one, so [Authorize(Roles = "Admin")]
+            // and User.IsInRole("Admin") - which the code already uses - pick portal access
+            // up without being rewritten. Emitted alongside the product role, not instead of
+            // it: a captain granted the dashboard must stay a captain to the rest of the API.
+            if (user.IsAdmin && user.Role != UserRole.Admin)
+            {
+                claimList.Add(new Claim(ClaimTypes.Role, nameof(UserRole.Admin)));
+            }
+
+            // Carried explicitly too, because the dashboard reads it straight off the token
+            // to decide whether to show itself at all.
+            claimList.Add(new Claim("is_admin", user.IsAdmin ? "true" : "false"));
+
             if (!string.IsNullOrEmpty(user.Email))
             {
-                var claimList = claims.ToList();
                 claimList.Add(new Claim(JwtRegisteredClaimNames.Email, user.Email));
-                claims = claimList.ToArray();
             }
+
+            var claims = claimList.ToArray();
 
             var token = new JwtSecurityToken(
                 issuer: jwtSettings["Issuer"],

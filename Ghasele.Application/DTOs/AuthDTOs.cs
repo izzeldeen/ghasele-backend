@@ -26,7 +26,7 @@ namespace Ghasele.Application.DTOs
     // IdentityToken is always present and is the source of truth we verify.
     public record AppleSignInRequest(string IdentityToken, string? FullName, string? Email);
     
-    public record AuthResponse(string Token, Guid Id, string Username, string? Email, string FullName, string PhoneNumber, bool IsPhoneVerified, string Role);
+    public record AuthResponse(string Token, Guid Id, string Username, string? Email, string FullName, string PhoneNumber, bool IsPhoneVerified, string Role, bool IsAdmin);
 
     /// Returned by start-registration and OTP verification while the phone is still unverified:
     /// no user exists yet, so there is no token to hand back.

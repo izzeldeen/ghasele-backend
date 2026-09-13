@@ -155,8 +155,7 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameEn = "Shirt",
                         IronPrice = 0.50m,
                         CleaningPrice = 0.75m,
-                        BothPrice = 1.00m,
-                        IsDeleted = false
+                        BothPrice = 1.00m,                        IsDeleted = false
                     },
                     new ItemType
                     {
@@ -165,8 +164,7 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameEn = "Trousers",
                         IronPrice = 0.75m,
                         CleaningPrice = 1.00m,
-                        BothPrice = 1.25m,
-                        IsDeleted = false
+                        BothPrice = 1.25m,                        IsDeleted = false
                     },
                     new ItemType
                     {
@@ -175,8 +173,7 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameEn = "Men's Suit",
                         IronPrice = 2.50m,
                         CleaningPrice = 3.50m,
-                        BothPrice = 5.00m,
-                        IsDeleted = false
+                        BothPrice = 5.00m,                        IsDeleted = false
                     },
                     new ItemType
                     {
@@ -185,8 +182,7 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameEn = "Evening Dress",
                         IronPrice = 4.00m,
                         CleaningPrice = 8.00m,
-                        BothPrice = 12.00m,
-                        IsDeleted = false
+                        BothPrice = 12.00m,                        IsDeleted = false
                     },
                     new ItemType
                     {
@@ -195,8 +191,7 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameEn = "Jacket",
                         IronPrice = 1.50m,
                         CleaningPrice = 2.00m,
-                        BothPrice = 2.50m,
-                        IsDeleted = false
+                        BothPrice = 2.50m,                        IsDeleted = false
                     },
                     new ItemType
                     {
@@ -205,8 +200,7 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameEn = "Large Blanket",
                         IronPrice = 0.00m,
                         CleaningPrice = 6.00m,
-                        BothPrice = 6.00m,
-                        IsDeleted = false
+                        BothPrice = 6.00m,                        IsDeleted = false
                     },
                     new ItemType
                     {
@@ -215,8 +209,7 @@ namespace Ghasele.Infrastructure.Data
                         TypeNameEn = "Thobe",
                         IronPrice = 1.00m,
                         CleaningPrice = 1.25m,
-                        BothPrice = 1.75m,
-                        IsDeleted = false
+                        BothPrice = 1.75m,                        IsDeleted = false
                     }
                 );
             });
