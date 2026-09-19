@@ -1,5 +1,7 @@
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Ghasele.API.Localization;
 using Ghasele.Application.DTOs;
 using Ghasele.Application.Exceptions;
@@ -91,6 +93,30 @@ namespace Ghasele.API.Controllers
                     .LogError(ex, "Failed to claim guest orders for user {UserId}", auth.Id);
             }
         }
+
+        /// <summary>
+        /// The id of the signed-in caller, or null when the request carries no usable token.
+        /// </summary>
+        /// <remarks>
+        /// Both claim names are checked because the two token issuers spell it differently: our
+        /// own JWTs carry "sub", while ASP.NET's inbound claim mapping can surface it as
+        /// <see cref="ClaimTypes.NameIdentifier"/>. Reading only one of them silently denies
+        /// every caller whose token used the other.
+        /// </remarks>
+        protected Guid? CallerId()
+        {
+            var raw = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                      ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            return Guid.TryParse(raw, out var id) ? id : null;
+        }
+
+        /// <summary>
+        /// True when the caller is acting on their own record, or is an admin acting on someone
+        /// else's. The guard for any endpoint that takes a user id from the route.
+        /// </summary>
+        protected bool IsSelfOrAdmin(Guid userId) =>
+            CallerId() == userId || User.IsInRole(nameof(UserRole.Admin));
 
         /// <summary>
         /// Builds the error body for a caught exception. An <see cref="AppException"/> yields its
