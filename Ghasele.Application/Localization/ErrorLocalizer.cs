@@ -87,6 +87,8 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.DeliveryWindowFull] = "That collection time is fully booked. Please choose another.",
             [ErrorCodes.OrderScheduleRequired] = "Please choose a collection time for your order.",
             [ErrorCodes.OrderScheduleNotBookable] = "That collection time has already passed. Please choose another.",
+            [ErrorCodes.OrderNotChangeable] = "This order can no longer be changed. Please contact support if you need help with it.",
+            [ErrorCodes.OrderCancelled] = "Your order has been cancelled.",
 
             [ErrorCodes.TicketAttachmentTooLarge] = "The photo is too large. Please attach an image under 5 MB.",
             [ErrorCodes.TicketAttachmentInvalidType] = "Only image files can be attached.",
@@ -171,6 +173,8 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.DeliveryWindowFull] = "موعد الاستلام هذا محجوز بالكامل. يرجى اختيار موعد آخر.",
             [ErrorCodes.OrderScheduleRequired] = "يرجى اختيار موعد استلام لطلبك.",
             [ErrorCodes.OrderScheduleNotBookable] = "موعد الاستلام هذا قد فات. يرجى اختيار موعد آخر.",
+            [ErrorCodes.OrderNotChangeable] = "لم يعد بالإمكان تعديل هذا الطلب. يرجى التواصل مع الدعم إذا كنت بحاجة إلى مساعدة.",
+            [ErrorCodes.OrderCancelled] = "تم إلغاء طلبك.",
 
             [ErrorCodes.TicketAttachmentTooLarge] = "حجم الصورة كبير جداً. يرجى إرفاق صورة أقل من 5 ميجابايت.",
             [ErrorCodes.TicketAttachmentInvalidType] = "يمكن إرفاق ملفات الصور فقط.",

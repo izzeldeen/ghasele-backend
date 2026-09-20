@@ -206,6 +206,54 @@ namespace Ghasele.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Cancels the caller's own order, while it is still awaiting collection.
+        /// </summary>
+        /// <remarks>
+        /// Anonymous like the rest of the customer-facing order endpoints, because a guest can
+        /// place an order and must be able to call it off. Neither identity is taken from the
+        /// body: the account comes from the bearer token and the device from the header, so a
+        /// caller can only ever reach orders that are already theirs.
+        /// </remarks>
+        [AllowAnonymous]
+        [HttpPost("{id}/cancel")]
+        public async Task<IActionResult> CancelOrder(Guid id)
+        {
+            try
+            {
+                var order = await _orderService.CancelOrderAsync(id, CallerId(), DeviceToken());
+                return Ok(order);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ErrorBody(ex));
+            }
+        }
+
+        /// <summary>
+        /// Moves the caller's own order to a different collection slot, while it is still
+        /// awaiting collection.
+        /// </summary>
+        /// <remarks>
+        /// Separate from <see cref="UpdateOrder"/> on purpose: that one takes a status and an
+        /// amount and belongs to the dashboard, and opening it to customers would let them
+        /// price or re-status their own order.
+        /// </remarks>
+        [AllowAnonymous]
+        [HttpPut("{id}/schedule")]
+        public async Task<IActionResult> RescheduleOrder(Guid id, [FromBody] RescheduleOrderDto dto)
+        {
+            try
+            {
+                var order = await _orderService.RescheduleOrderAsync(id, dto, CallerId(), DeviceToken());
+                return Ok(order);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ErrorBody(ex));
+            }
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteOrder(Guid id)
         {

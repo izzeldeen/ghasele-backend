@@ -67,7 +67,7 @@ namespace Ghasele.Application.Services
             // The booked trip schedule slot. Validated here rather than trusted from the
             // client: the slot list the app rendered may be minutes old, and in that time the
             // window can have been deactivated, started, or filled by someone else.
-            var window = await ResolveScheduledWindowAsync(dto);
+            var window = await ResolveScheduledWindowAsync(dto.DeliveryWindowId, dto.ScheduledDate);
 
             // Stamp the fee at order time from the admin-managed settings, so a price change
             // between ordering and collection cannot charge the customer more than they were
@@ -129,14 +129,14 @@ namespace Ghasele.Application.Services
         /// bookable, so each gets its own message - "that time is now full" and "we no longer
         /// run that window" need different things from the customer.
         /// </remarks>
-        private async Task<DeliveryWindow> ResolveScheduledWindowAsync(CreateOrderDto dto)
+        private async Task<DeliveryWindow> ResolveScheduledWindowAsync(Guid? deliveryWindowId, DateOnly? scheduledDate)
         {
-            if (dto.DeliveryWindowId == null || dto.ScheduledDate == null)
+            if (deliveryWindowId == null || scheduledDate == null)
             {
                 throw new AppException(ErrorCodes.OrderScheduleRequired);
             }
 
-            var window = await _deliveryWindowRepository.GetByIdAsync(dto.DeliveryWindowId.Value)
+            var window = await _deliveryWindowRepository.GetByIdAsync(deliveryWindowId.Value)
                          ?? throw new AppException(ErrorCodes.DeliveryWindowNotFound);
 
             if (!window.IsActive)
@@ -147,12 +147,12 @@ namespace Ghasele.Application.Services
             // Rejects both past dates and a date whose window has already started today, on the
             // operator's clock. This is also what stops a client inventing its own date: only a
             // date the slots endpoint would have offered survives.
-            if (!JordanTime.IsUpcoming(dto.ScheduledDate.Value, window.StartTime))
+            if (!JordanTime.IsUpcoming(scheduledDate.Value, window.StartTime))
             {
                 throw new AppException(ErrorCodes.OrderScheduleNotBookable);
             }
 
-            var booked = await _orderRepository.CountBookedAsync(window.Id, dto.ScheduledDate.Value);
+            var booked = await _orderRepository.CountBookedAsync(window.Id, scheduledDate.Value);
             if (booked >= window.Capacity)
             {
                 throw new AppException(ErrorCodes.DeliveryWindowFull);
@@ -418,6 +418,115 @@ namespace Ghasele.Application.Services
             await _orderRepository.UpdateAsync(order);
             var itemTypes = await _itemTypeRepository.GetAllAsync();
             return MapToDto(order, _language.Language, itemTypes);
+        }
+
+        /// <summary>
+        /// Cancels the customer's own order, while it is still theirs to cancel.
+        /// </summary>
+        /// <remarks>
+        /// A soft cancel, not a delete: the row stays for the customer's history and the
+        /// operator's reporting, and CountBookedAsync already skips Cancelled orders, so the
+        /// slot seat is handed back to the schedule the moment this runs.
+        /// </remarks>
+        public async Task<OrderDto> CancelOrderAsync(Guid id, Guid? callerId, string? deviceToken)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
+
+            EnsureOwnedByCaller(order, callerId, deviceToken);
+            EnsureCustomerChangeable(order);
+
+            order.Status = OrderStatus.Cancelled;
+            await _orderRepository.UpdateAsync(order);
+
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+            return MapToDto(order, _language.Language, itemTypes);
+        }
+
+        /// <summary>
+        /// Moves the customer's own order to a different collection slot.
+        /// </summary>
+        /// <remarks>
+        /// The new slot goes through the same validation as a slot chosen at checkout, so a
+        /// window that has since been switched off, filled or started is refused here exactly
+        /// as it would be there - and with the same message, which the app already handles.
+        /// </remarks>
+        public async Task<OrderDto> RescheduleOrderAsync(Guid id, RescheduleOrderDto dto, Guid? callerId, string? deviceToken)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
+
+            EnsureOwnedByCaller(order, callerId, deviceToken);
+            EnsureCustomerChangeable(order);
+
+            var itemTypes = await _itemTypeRepository.GetAllAsync();
+
+            // Re-picking the slot the order already holds is a no-op, and must not go through
+            // the capacity check: this order is itself part of that window's booked count, so
+            // a full-but-for-this-order slot would be refused as full.
+            if (order.DeliveryWindowId == dto.DeliveryWindowId && order.ScheduledDate == dto.ScheduledDate)
+            {
+                return MapToDto(order, _language.Language, itemTypes);
+            }
+
+            var window = await ResolveScheduledWindowAsync(dto.DeliveryWindowId, dto.ScheduledDate);
+
+            order.DeliveryWindowId = window.Id;
+            order.ScheduledDate = dto.ScheduledDate!.Value;
+            // Re-stamped from the window, for the same reason CreateOrderAsync stamps them:
+            // the customer is promised the times they are being shown right now.
+            order.ScheduledStartTime = window.StartTime;
+            order.ScheduledEndTime = window.EndTime;
+
+            await _orderRepository.UpdateAsync(order);
+
+            return MapToDto(order, _language.Language, itemTypes);
+        }
+
+        /// <summary>
+        /// Refuses the request unless it comes from whoever placed the order.
+        /// </summary>
+        /// <remarks>
+        /// A signed-in customer is matched on the account; a guest on the device token that
+        /// placed the order, which is their only credential. Both are accepted on every call
+        /// because an order placed as a guest and later claimed by an account can legitimately
+        /// be reached either way, depending on whether the app is signed in yet.
+        /// <para>
+        /// Reported as "not found" rather than as a refusal: someone probing ids must not be
+        /// able to tell another customer's order from one that does not exist.
+        /// </para>
+        /// </remarks>
+        private static void EnsureOwnedByCaller(Order order, Guid? callerId, string? deviceToken)
+        {
+            var token = deviceToken?.Trim();
+
+            var ownedByCaller = callerId != null && order.UserId == callerId;
+            var ownedByDevice = !string.IsNullOrWhiteSpace(token)
+                                && !string.IsNullOrWhiteSpace(order.DeviceToken)
+                                && string.Equals(order.DeviceToken, token, StringComparison.Ordinal);
+
+            if (!ownedByCaller && !ownedByDevice)
+            {
+                throw AppException.NotFound(ErrorCodes.OrderNotFound);
+            }
+        }
+
+        /// <summary>
+        /// Refuses the request unless the order is still one the customer may change.
+        /// </summary>
+        /// <remarks>
+        /// PendingCollection is the whole window: joining a trip moves an order to Assigned
+        /// (see TripService), so anything further along is already excluded by the status
+        /// check alone. The trip test is a second line of defence for an order that somehow
+        /// rides a trip that has set off - a driver on the road must not have the stop pulled
+        /// out from under them.
+        /// </remarks>
+        private static void EnsureCustomerChangeable(Order order)
+        {
+            if (order.Status != OrderStatus.PendingCollection || order.Trip?.StartedAt != null)
+            {
+                throw new AppException(ErrorCodes.OrderNotChangeable);
+            }
         }
 
         public async Task<OrderDto> DeleteOrderItemAsync(Guid orderId, Guid itemId)

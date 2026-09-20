@@ -122,6 +122,15 @@ namespace Ghasele.Application.Localization
         /// <summary>The chosen date/window pair is in the past, or has already started today.</summary>
         public const string OrderScheduleNotBookable = "order.schedule_not_bookable";
 
+        /// <summary>
+        /// The customer tried to cancel or move an order that has moved on: it is no longer
+        /// PendingCollection, or the trip carrying it has already set off.
+        /// </summary>
+        public const string OrderNotChangeable = "order.not_changeable";
+
+        /// <summary>Confirmation that a customer's cancellation went through.</summary>
+        public const string OrderCancelled = "order.cancelled";
+
         // Support tickets
         public const string TicketAttachmentTooLarge = "ticket.attachment_too_large";
         public const string TicketAttachmentInvalidType = "ticket.attachment_invalid_type";

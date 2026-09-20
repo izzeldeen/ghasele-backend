@@ -62,6 +62,23 @@ namespace Ghasele.Application.DTOs
         // Normal/Express pair is gone, so a client sending one has nothing to select.
     }
 
+    /// <summary>
+    /// The customer moving their own order to a different collection slot.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately only the slot. A reschedule must not be a back door into re-pricing
+    /// or relocating an order, so the fields an admin can change live on
+    /// <see cref="UpdateOrderDto"/> and stay behind the admin-only endpoint.
+    /// </remarks>
+    public class RescheduleOrderDto
+    {
+        /// <summary>The newly chosen window, from <c>GET /api/delivery-windows/slots</c>.</summary>
+        public Guid? DeliveryWindowId { get; set; }
+
+        /// <summary>Local (Amman) date for that window, "yyyy-MM-dd".</summary>
+        public DateOnly? ScheduledDate { get; set; }
+    }
+
     public class UpdateOrderDto
     {
         public double? Lat { get; set; }

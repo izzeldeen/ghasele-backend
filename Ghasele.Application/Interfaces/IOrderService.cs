@@ -26,6 +26,19 @@ namespace Ghasele.Application.Interfaces
         Task<OrderDto?> GetOrderByIdAsync(Guid id);
         Task<OrderDto> AddItemsToOrderAsync(Guid orderId, AddOrderItemsDto dto);
         Task<OrderDto> UpdateOrderAsync(Guid id, UpdateOrderDto dto);
+
+        /// <summary>
+        /// Cancels the customer's own order, while it is still theirs to cancel.
+        /// </summary>
+        /// <remarks>
+        /// Ownership is proved by exactly one of the two arguments - the signed-in caller's
+        /// id, or the device token a guest placed the order with - and is checked here rather
+        /// than at the controller, so both entry points enforce the same rule.
+        /// </remarks>
+        Task<OrderDto> CancelOrderAsync(Guid id, Guid? callerId, string? deviceToken);
+
+        /// <summary>Moves the customer's own order to a different collection slot.</summary>
+        Task<OrderDto> RescheduleOrderAsync(Guid id, RescheduleOrderDto dto, Guid? callerId, string? deviceToken);
         Task<OrderDto> DeleteOrderItemAsync(Guid orderId, Guid itemId);
         Task DeleteOrderAsync(Guid id);
     }
