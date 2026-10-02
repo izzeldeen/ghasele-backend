@@ -72,6 +72,8 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.DriverDeleted] = "Driver deleted successfully.",
 
             [ErrorCodes.ItemTypeNotFound] = "Item type not found.",
+            [ErrorCodes.ItemTypePriceRangeInvalid] = "The highest price must not be below the starting price.",
+            [ErrorCodes.CleanerSharePercentageInvalid] = "The laundry share must be between 0 and 100.",
 
             [ErrorCodes.MarketingCodeNotFound] = "Marketing code not found.",
             [ErrorCodes.MarketingCodeInvalidOrInactive] = "Invalid or inactive marketing code.",
@@ -158,6 +160,8 @@ namespace Ghasele.Application.Localization
             [ErrorCodes.DriverDeleted] = "تم حذف السائق بنجاح.",
 
             [ErrorCodes.ItemTypeNotFound] = "لم يتم العثور على نوع الصنف.",
+            [ErrorCodes.ItemTypePriceRangeInvalid] = "يجب ألا يكون السعر الأعلى أقل من السعر الأساسي.",
+            [ErrorCodes.CleanerSharePercentageInvalid] = "يجب أن تكون حصة المغسلة بين 0 و100.",
 
             [ErrorCodes.MarketingCodeNotFound] = "لم يتم العثور على الرمز التسويقي.",
             [ErrorCodes.MarketingCodeInvalidOrInactive] = "الرمز التسويقي غير صالح أو غير مفعّل.",

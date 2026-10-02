@@ -17,9 +17,7 @@ namespace Ghasele.Application.Interfaces
         /// This cleaner's rate card: every active item type, with the customer prices from the
         /// item type and whatever rate has been agreed with this cleaner (0 where none has).
         /// </summary>
-        Task<List<CleanerItemPriceDto>> GetItemPricesAsync(Guid cleanerId);
 
         /// <summary>Replaces this cleaner's agreed rates with the submitted grid.</summary>
-        Task<List<CleanerItemPriceDto>> SaveItemPricesAsync(Guid cleanerId, SaveCleanerItemPricesDto dto);
     }
 }

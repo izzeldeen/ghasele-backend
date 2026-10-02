@@ -94,6 +94,12 @@ namespace Ghasele.Application.Localization
         // Item types
         public const string ItemTypeNotFound = "item_type.not_found";
 
+        /// <summary>A price ceiling was sent below the base price it belongs to.</summary>
+        public const string ItemTypePriceRangeInvalid = "item_type.price_range_invalid";
+
+        /// <summary>A laundry share outside 0-100 was sent.</summary>
+        public const string CleanerSharePercentageInvalid = "cleaner.share_percentage_invalid";
+
         // Marketing codes
         public const string MarketingCodeNotFound = "marketing_code.not_found";
         public const string MarketingCodeInvalidOrInactive = "marketing_code.invalid_or_inactive";

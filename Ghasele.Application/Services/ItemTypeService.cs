@@ -22,15 +22,33 @@ namespace Ghasele.Application.Services
             _language = language;
         }
 
+        /// <summary>
+        /// Refuses a ceiling that sits below the base price it belongs to.
+        /// </summary>
+        /// <remarks>
+        /// Checked here rather than left to the display rule, because there is no sensible
+        /// way to show "from 10 to 3": every client would have to invent its own answer, and
+        /// they would not agree. A ceiling equal to the base is allowed and means a fixed
+        /// price; null means the price is open-ended.
+        /// </remarks>
+        private static void EnsurePriceRangeValid(CreateItemTypeDto dto)
+        {
+            if (dto.MaxPrice.HasValue && dto.MaxPrice.Value < dto.Price)
+            {
+                throw new AppException(ErrorCodes.ItemTypePriceRangeInvalid);
+            }
+        }
+
         public async Task<ItemTypeDto> CreateItemTypeAsync(CreateItemTypeDto dto)
         {
+            EnsurePriceRangeValid(dto);
+
             var itemType = new ItemType
             {
                 TypeNameAr = dto.TypeNameAr,
                 TypeNameEn = dto.TypeNameEn,
-                IronPrice = dto.IronPrice,
-                CleaningPrice = dto.CleaningPrice,
-                BothPrice = dto.BothPrice,
+                Price = dto.Price,
+                MaxPrice = dto.MaxPrice,
                 SortOrder = dto.SortOrder ?? await NextSortOrderAsync(),
             };
 
@@ -61,14 +79,15 @@ namespace Ghasele.Application.Services
 
         public async Task<ItemTypeDto> UpdateItemTypeAsync(Guid id, CreateItemTypeDto dto)
         {
+            EnsurePriceRangeValid(dto);
+
             var item = await _repository.GetByIdAsync(id);
             if (item == null) throw AppException.NotFound(ErrorCodes.ItemTypeNotFound);
 
             item.TypeNameAr = dto.TypeNameAr;
             item.TypeNameEn = dto.TypeNameEn;
-            item.IronPrice = dto.IronPrice;
-            item.CleaningPrice = dto.CleaningPrice;
-            item.BothPrice = dto.BothPrice;
+            item.Price = dto.Price;
+            item.MaxPrice = dto.MaxPrice;
             // Left where it is when the caller says nothing, so an edit that only touches
             // prices cannot quietly move the item on the customer's pricing page.
             if (dto.SortOrder.HasValue) item.SortOrder = dto.SortOrder.Value;
@@ -86,9 +105,8 @@ namespace Ghasele.Application.Services
                 TypeNameAr = item.TypeNameAr,
                 TypeNameEn = item.TypeNameEn,
                 TypeName = BilingualText.Pick(item.TypeNameAr, item.TypeNameEn, _language.Language),
-                IronPrice = item.IronPrice,
-                CleaningPrice = item.CleaningPrice,
-                BothPrice = item.BothPrice,
+                Price = item.Price,
+                MaxPrice = item.MaxPrice,
                 SortOrder = item.SortOrder,
             };
         }

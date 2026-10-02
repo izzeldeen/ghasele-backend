@@ -133,8 +133,18 @@ namespace Ghasele.Application.Services
             // Notifications
             foreach (var order in trip.Orders)
             {
-                string title = "تحديث طلب";
-                string body = "السائق في الطريق لاستلام طلبك!";
+                // A title of its own rather than a generic "order update": three different
+                // events used to arrive on the lockscreen looking identical, so the one the
+                // customer had to act on was indistinguishable from the ones they did not.
+                //
+                // Arabic only, as every push here is - there is no request to read
+                // Accept-Language from when the server sends one, and nothing on the account
+                // records which language the customer reads. The approved English reads:
+                //   "Your driver is on the way"
+                //   "Your driver is on the way to pick up your order. Please have your
+                //    clothes ready."
+                string title = "السائق في طريقه إليك";
+                string body = "السائق في طريقه لاستلام طلبك خلال الموعد الذي اخترته. جهّز ملابسك وسنصل إليك.";
 
                 // Only a signed-in order gets an in-app record - that list is keyed by user, and
                 // a guest has no account to read it from. They still get the push below.
@@ -208,6 +218,9 @@ namespace Ghasele.Application.Services
             if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
             if (order.TripId == null) throw new AppException(ErrorCodes.OrderNotPartOfTrip);
 
+            // Read before overwriting: the "on the way" push goes out on the transition into
+            // OutForDelivery only, so re-sending the same status never notifies twice.
+            var previousStatus = order.Status;
             order.Status = status;
             await _orderRepository.UpdateAsync(order);
 
@@ -215,10 +228,18 @@ namespace Ghasele.Application.Services
             if (trip == null) throw AppException.NotFound(ErrorCodes.TripNotFound);
 
             // Side Effects
-            if (status == OrderStatus.OutForDelivery)
+            if (status == OrderStatus.OutForDelivery && previousStatus != OrderStatus.OutForDelivery)
             {
-                string title = "تحديث طلب";
-                string body = "طلبك الآن في طريقه إليك!";
+                // Sent when the admin starts a delivery round (Deliver Order page) or the
+                // driver app marks the order out for delivery.
+                // English, for when these can be localized:
+                //   "✨ Your order is ready and on its way to you!"
+                //   "We took care of every item, and now it's time for them to come back to you
+                //    clean and neat, just how you like them 🤍 Your order will reach you soon -
+                //    thank you for trusting Cleanyjo."
+                // The blank line splits the two thoughts in the expanded notification.
+                string title = "✨ طلبك صار جاهز وبطريقه إلك!";
+                string body = "اعتنينا بكل قطعة بعناية، وحان وقت ترجع لعندك نظيفة ومرتبة مثل ما بتحب 🤍\n\nاستقبل طلبك قريبًا، وشكرًا لثقتك بـ Cleanyjo";
 
                 // In-app record for accounts only, push for everyone - as on collection above.
                 if (order.UserId is Guid ownerId)
@@ -234,6 +255,8 @@ namespace Ghasele.Application.Services
             }
             else if (status == OrderStatus.Delivered)
             {
+                await NotifyOrderDeliveredAsync(order);
+
                 // Auto-transition trip status if all orders are Delivered
                 if (trip.Orders.All(o => o.Status == OrderStatus.Delivered))
                 {
@@ -243,6 +266,37 @@ namespace Ghasele.Application.Services
             }
 
             return MapToDto(trip);
+        }
+
+        /// <summary>
+        /// Tells the customer their order has arrived.
+        /// </summary>
+        /// <remarks>
+        /// Shared by both routes to Delivered - the generic status update and
+        /// <see cref="DeliverOrderAsync"/> - because the driver app can take either, and a
+        /// delivery that notifies down one path and not the other is worse than one that
+        /// never notified at all.
+        /// <para>
+        /// Arabic only, as every push here is; the approved English reads "Delivered!" /
+        /// "Your order has been delivered. We hope you love the fresh, clean result!"
+        /// </para>
+        /// </remarks>
+        private async Task NotifyOrderDeliveredAsync(Order order)
+        {
+            const string title = "تم توصيل طلبك!";
+            const string body = "تم توصيل طلبك إلى العنوان المحدد. نتمنى أن تستمتع بملابسك النظيفة!";
+
+            // In-app record for accounts only, push for everyone - as everywhere else here.
+            if (order.UserId is Guid ownerId)
+            {
+                await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
+            }
+
+            var pushToken = order.ResolvePushToken();
+            if (!string.IsNullOrEmpty(pushToken))
+            {
+                await _notificationService.SendNotificationAsync(pushToken, title, body);
+            }
         }
 
         public async Task<TripDto> DeliverOrderAsync(Guid orderId)
@@ -256,6 +310,8 @@ namespace Ghasele.Application.Services
 
             order.Status = OrderStatus.Delivered;
             await _orderRepository.UpdateAsync(order);
+
+            await NotifyOrderDeliveredAsync(order);
 
             // Auto-transition trip status if all orders are Delivered
             if (trip.Orders.All(o => o.Status == OrderStatus.Delivered))

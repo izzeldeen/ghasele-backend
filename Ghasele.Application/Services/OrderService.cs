@@ -15,10 +15,21 @@ namespace Ghasele.Application.Services
 {
     public class OrderService : IOrderService
     {
+        /// <summary>
+        /// The share used when an order is itemised before a laundry has been assigned to
+        /// its trip, so there is nobody to read an agreed share from.
+        /// </summary>
+        /// <remarks>
+        /// Recording no cost at all would make the order look like pure margin in every
+        /// report until someone noticed. Half is the standard agreement, so assuming it is
+        /// closer to the truth than assuming zero.
+        /// </remarks>
+        private const decimal FallbackSharePercentage = 50m;
+
         private readonly IOrderRepository _orderRepository;
         private readonly IDeliveryWindowRepository _deliveryWindowRepository;
         private readonly IItemTypeRepository _itemTypeRepository;
-        private readonly ICleanerItemPriceRepository _cleanerItemPriceRepository;
+        private readonly ICleanerRepository _cleanerRepository;
         private readonly IMarketingCodeRepository _marketingCodeRepository;
         private readonly ITripRepository _tripRepository;
         private readonly IAppSettingsRepository _appSettingsRepository;
@@ -26,12 +37,12 @@ namespace Ghasele.Application.Services
         private readonly INotificationService _notificationService;
         private readonly IUserNotificationService _userNotificationService;
 
-        public OrderService(IOrderRepository orderRepository, IDeliveryWindowRepository deliveryWindowRepository, IItemTypeRepository itemTypeRepository, ICleanerItemPriceRepository cleanerItemPriceRepository, IMarketingCodeRepository marketingCodeRepository, ITripRepository tripRepository, IAppSettingsRepository appSettingsRepository, ICurrentLanguageProvider language, INotificationService notificationService, IUserNotificationService userNotificationService)
+        public OrderService(IOrderRepository orderRepository, IDeliveryWindowRepository deliveryWindowRepository, IItemTypeRepository itemTypeRepository, ICleanerRepository cleanerRepository, IMarketingCodeRepository marketingCodeRepository, ITripRepository tripRepository, IAppSettingsRepository appSettingsRepository, ICurrentLanguageProvider language, INotificationService notificationService, IUserNotificationService userNotificationService)
         {
             _orderRepository = orderRepository;
             _deliveryWindowRepository = deliveryWindowRepository;
             _itemTypeRepository = itemTypeRepository;
-            _cleanerItemPriceRepository = cleanerItemPriceRepository;
+            _cleanerRepository = cleanerRepository;
             _marketingCodeRepository = marketingCodeRepository;
             _tripRepository = tripRepository;
             _appSettingsRepository = appSettingsRepository;
@@ -232,11 +243,12 @@ namespace Ghasele.Application.Services
             // Need to calculate price based on ItemTypes
             var allItemTypes = await _itemTypeRepository.GetAllAsync();
 
-            // What we pay is negotiated per laundry, so pricing needs to know which one is
-            // handling this order. The trip carries that, and a trip is always assigned before a
-            // driver can itemise the pickup. An order priced with no cleaner assigned, or with a
-            // laundry whose rate card is empty, records no cleaner cost at all - see below.
-            var cleanerPrices = await GetCleanerRateCardAsync(order.TripId);
+            // What we pay is a share of what the customer pays, and the share is agreed per
+            // laundry. The trip carries which one is handling this order, and a trip is
+            // always assigned before a driver can itemise the pickup - so this is read once
+            // here rather than per line.
+            var sharePercentage = await GetCleanerSharePercentageAsync(order.TripId);
+
 
             decimal itemsTotal = 0;
             decimal costTotal = 0;
@@ -267,23 +279,24 @@ namespace Ghasele.Application.Services
                     t.TypeNameAr.Equals(itemDto.ItemType, StringComparison.OrdinalIgnoreCase));
                 if (itemType != null)
                 {
-                    decimal price = serviceType switch
-                    {
-                        ServiceType.Cleaning => itemType.CleaningPrice,
-                        ServiceType.Both => itemType.BothPrice,
-                        _ => itemType.IronPrice
-                    };
+                    // The catalogue price is the floor of a quote, not the bill. The driver
+                    // settles the real figure with the garment in hand, so their number wins
+                    // whenever they send one; without it the item falls back to its base
+                    // price, which is what a caller written before this field existed sends.
+                    //
+                    // A negative price is ignored rather than trusted - it would credit the
+                    // customer and pay the laundry a negative amount.
+                    //
+                    // There is one service now - washing and ironing - so the item has one
+                    // price and the service on the line no longer selects between three.
+                    decimal price = PricingRules.ResolveUnitPrice(itemDto.Price, itemType.Price);
 
-                    // What we pay comes only from the rate agreed with the laundry handling this
-                    // order. There is no per-item fallback: item types carry customer prices
-                    // alone, so an item with no agreed rate costs us nothing on paper until one
-                    // is entered on that laundry's rate card. The customer price above is never
-                    // touched by any of this - what we pay and what we charge move independently.
-                    decimal cost = 0;
-                    if (cleanerPrices != null && cleanerPrices.TryGetValue(itemType.Id, out var agreed))
-                    {
-                        cost = agreed.PriceFor(serviceType);
-                    }
+                    // What we pay the laundry is their agreed share of what the customer
+                    // pays, so a laundry on 60% earns more of the same line than one on 50%.
+                    //
+                    // This replaced the per-item rate card: a rate agreed per garment could
+                    // not follow a price the driver settles at the door.
+                    decimal cost = PricingRules.CleanerCost(price, sharePercentage);
 
                     // Frozen onto the line so that re-reading this order later shows what it was
                     // priced at, not what the pricing tables happen to say today.
@@ -358,22 +371,18 @@ namespace Ghasele.Application.Services
         }
 
         /// <summary>
-        /// The agreed rates of the laundry assigned to <paramref name="tripId"/>, keyed by item
-        /// type, or null when there is no trip, no cleaner on it, or nothing agreed with them.
+        /// The agreed share of the laundry assigned to <paramref name="tripId"/>, or the
+        /// fallback when there is no trip or no laundry on it yet.
         /// </summary>
-        /// <remarks>
-        /// Null and empty mean the same thing to the caller - nothing is owed to a laundry we
-        /// have agreed no rates with - so there is no point distinguishing them.
-        /// </remarks>
-        private async Task<Dictionary<Guid, CleanerItemPrice>?> GetCleanerRateCardAsync(Guid? tripId)
+        private async Task<decimal> GetCleanerSharePercentageAsync(Guid? tripId)
         {
-            if (tripId is not Guid id) return null;
+            if (tripId is not Guid id) return FallbackSharePercentage;
 
             var trip = await _tripRepository.GetByIdAsync(id);
-            if (trip?.CleanerId is not Guid cleanerId) return null;
+            if (trip?.CleanerId is not Guid cleanerId) return FallbackSharePercentage;
 
-            var prices = await _cleanerItemPriceRepository.GetByCleanerAsync(cleanerId);
-            return prices.Count == 0 ? null : prices.ToDictionary(p => p.ItemTypeId);
+            var cleaner = await _cleanerRepository.GetByIdAsync(cleanerId);
+            return cleaner?.SharePercentage ?? FallbackSharePercentage;
         }
 
         // Tells the customer the price once the driver has itemised their pickup. A push failure
@@ -384,8 +393,18 @@ namespace Ghasele.Application.Services
             // Two decimals with invariant digits: an Arabic device locale would otherwise render
             // Eastern-Arabic numerals here, which is not how the apps show prices elsewhere.
             var amount = order.TotalAmount.ToString("0.00", CultureInfo.InvariantCulture);
-            string title = "تحديث طلب";
-            string body = $"تم تجهيز طلبك {order.ReferenceNumber} بقيمة {amount} دينار.";
+            // The customer has had no total until this moment - the items are priced only
+            // after the driver counts them - so this message is the first and only place the
+            // price appears. It leads with the reassurance that the items are safely with us
+            // and carries the total inside that, rather than opening with a bare number.
+            //
+            // Arabic only, as every push is; the approved English reads:
+            //   "Your items are in good hands ✨"
+            //   "We've picked up your items and they're now in our care. Your total is
+            //    {price} JOD. We'll take good care of them and bring them back to you fresh
+            //    and clean when they're ready."
+            string title = "أغراضك بأيدٍ أمينة ✨";
+            string body = $"استلمنا أغراضك وأصبحت بأيدٍ أمينة. المجموع {amount} دينار. سنعتني بها جيدًا ونعيدها إليك نظيفة وجاهزة عند اكتمالها.";
 
             // The in-app list is keyed by user, so only a signed-in order gets a stored record.
             // A guest has no account to read one from - the push is their whole notification.

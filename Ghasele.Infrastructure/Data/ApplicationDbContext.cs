@@ -124,6 +124,9 @@ namespace Ghasele.Infrastructure.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.NameAr).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.NameEn).IsRequired().HasMaxLength(100);
+                // A percentage, so two decimals is more than enough - and it keeps the
+                // column from defaulting to the provider's widest numeric.
+                entity.Property(e => e.SharePercentage).HasPrecision(5, 2);
             });
 
             modelBuilder.Entity<OrderItem>(entity =>
@@ -143,9 +146,10 @@ namespace Ghasele.Infrastructure.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.TypeNameAr).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.TypeNameEn).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.IronPrice).HasPrecision(18, 2);
-                entity.Property(e => e.CleaningPrice).HasPrecision(18, 2);
-                entity.Property(e => e.BothPrice).HasPrecision(18, 2);
+                entity.Property(e => e.Price).HasPrecision(18, 2);
+                // Same precision as the base price it caps - a ceiling stored to a
+                // different scale than its floor would round differently on the way out.
+                entity.Property(e => e.MaxPrice).HasPrecision(18, 2);
 
                 entity.HasData(
                     new ItemType
@@ -153,63 +157,56 @@ namespace Ghasele.Infrastructure.Data
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-111111111111"),
                         TypeNameAr = "قميص",
                         TypeNameEn = "Shirt",
-                        IronPrice = 0.50m,
-                        CleaningPrice = 0.75m,
-                        BothPrice = 1.00m,                        IsDeleted = false
+                        Price = 1.00m,
+                        IsDeleted = false
                     },
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-222222222222"),
                         TypeNameAr = "بنطلون",
                         TypeNameEn = "Trousers",
-                        IronPrice = 0.75m,
-                        CleaningPrice = 1.00m,
-                        BothPrice = 1.25m,                        IsDeleted = false
+                        Price = 1.25m,
+                        IsDeleted = false
                     },
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-333333333333"),
                         TypeNameAr = "بدلة رجالية",
                         TypeNameEn = "Men's Suit",
-                        IronPrice = 2.50m,
-                        CleaningPrice = 3.50m,
-                        BothPrice = 5.00m,                        IsDeleted = false
+                        Price = 5.00m,
+                        IsDeleted = false
                     },
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-444444444444"),
                         TypeNameAr = "فستان سهرة",
                         TypeNameEn = "Evening Dress",
-                        IronPrice = 4.00m,
-                        CleaningPrice = 8.00m,
-                        BothPrice = 12.00m,                        IsDeleted = false
+                        Price = 12.00m,
+                        IsDeleted = false
                     },
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-555555555555"),
                         TypeNameAr = "جاكيت",
                         TypeNameEn = "Jacket",
-                        IronPrice = 1.50m,
-                        CleaningPrice = 2.00m,
-                        BothPrice = 2.50m,                        IsDeleted = false
+                        Price = 2.50m,
+                        IsDeleted = false
                     },
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-666666666666"),
                         TypeNameAr = "لحاف/بطانية كبير",
                         TypeNameEn = "Large Blanket",
-                        IronPrice = 0.00m,
-                        CleaningPrice = 6.00m,
-                        BothPrice = 6.00m,                        IsDeleted = false
+                        Price = 6.00m,
+                        IsDeleted = false
                     },
                     new ItemType
                     {
                         Id = Guid.Parse("f9e1e1e1-1234-4a5b-bcde-777777777777"),
                         TypeNameAr = "ثوب/دشداشة",
                         TypeNameEn = "Thobe",
-                        IronPrice = 1.00m,
-                        CleaningPrice = 1.25m,
-                        BothPrice = 1.75m,                        IsDeleted = false
+                        Price = 1.75m,
+                        IsDeleted = false
                     }
                 );
             });

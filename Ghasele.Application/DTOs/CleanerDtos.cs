@@ -14,6 +14,11 @@ namespace Ghasele.Application.DTOs
         public string? CleaningLocation { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+        /// <summary>
+        /// The share of each order line this laundry is paid, as a percentage of what the
+        /// customer was charged. 50 means half. See Cleaner.SharePercentage.
+        /// </summary>
+        public decimal SharePercentage { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
@@ -25,6 +30,13 @@ namespace Ghasele.Application.DTOs
         public string? CleaningLocation { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+
+        /// <summary>
+        /// The share of each order line this laundry is paid, 0-100. Optional: a laundry
+        /// created without one is put on the standard half share rather than on nothing,
+        /// which would quietly record every order they handle as costing us zero.
+        /// </summary>
+        public decimal? SharePercentage { get; set; }
     }
 
     /// <summary>
@@ -83,5 +95,8 @@ namespace Ghasele.Application.DTOs
         public string? CleaningLocation { get; set; }
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
+
+        /// <summary>The laundry's share, 0-100. Left as it is when omitted.</summary>
+        public decimal? SharePercentage { get; set; }
     }
 }

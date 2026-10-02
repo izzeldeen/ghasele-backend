@@ -171,5 +171,20 @@ namespace Ghasele.Application.DTOs
         public string ItemType { get; set; } = string.Empty;
         public string ServiceType { get; set; } = "Iron";
         public int Quantity { get; set; }
+
+        /// <summary>
+        /// What one of these costs on this order, entered by the driver at collection.
+        /// </summary>
+        /// <remarks>
+        /// The catalogue price is a quote - most items carry a range, because what an evening
+        /// dress costs is not knowable until someone has it in hand. This is the figure the
+        /// driver settles on with the garment in front of them, and it is what the customer
+        /// is billed.
+        /// <para>
+        /// Optional. Omitted, the item falls back to its catalogue base price, which is what
+        /// every caller written before this field existed sends.
+        /// </para>
+        /// </remarks>
+        public decimal? Price { get; set; }
     }
 }
