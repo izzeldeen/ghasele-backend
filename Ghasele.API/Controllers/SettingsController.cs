@@ -46,11 +46,12 @@ namespace Ghasele.API.Controllers
         }
 
         /// <summary>
-        /// Prices only, so the customer app can label the Normal/Express choice.
-        /// Any signed-in customer may read this; the full settings object above is
-        /// admin-facing.
+        /// Prices only, so the customer app can show the delivery fee at checkout.
+        /// Anonymous because guests check out too, and the fee is public information;
+        /// the full settings object above stays admin-facing.
         /// </summary>
         [HttpGet("delivery-pricing")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetDeliveryPricing()
         {
             try

@@ -146,12 +146,7 @@ namespace Ghasele.Application.Services
                 string title = "السائق في طريقه إليك";
                 string body = "السائق في طريقه لاستلام طلبك خلال الموعد الذي اخترته. جهّز ملابسك وسنصل إليك.";
 
-                // Only a signed-in order gets an in-app record - that list is keyed by user, and
-                // a guest has no account to read it from. They still get the push below.
-                if (order.UserId is Guid ownerId)
-                {
-                    await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
-                }
+                await _userNotificationService.CreateForOrderAsync(order, title, body);
 
                 // A guest order carries the device's push token itself; see Order.ResolvePushToken.
                 var pushToken = order.ResolvePushToken();
@@ -241,11 +236,7 @@ namespace Ghasele.Application.Services
                 string title = "✨ طلبك صار جاهز وبطريقه إلك!";
                 string body = "اعتنينا بكل قطعة بعناية، وحان وقت ترجع لعندك نظيفة ومرتبة مثل ما بتحب 🤍\n\nاستقبل طلبك قريبًا، وشكرًا لثقتك بـ Cleanyjo";
 
-                // In-app record for accounts only, push for everyone - as on collection above.
-                if (order.UserId is Guid ownerId)
-                {
-                    await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
-                }
+                await _userNotificationService.CreateForOrderAsync(order, title, body);
 
                 var pushToken = order.ResolvePushToken();
                 if (!string.IsNullOrEmpty(pushToken))
@@ -286,11 +277,7 @@ namespace Ghasele.Application.Services
             const string title = "تم توصيل طلبك!";
             const string body = "تم توصيل طلبك إلى العنوان المحدد. نتمنى أن تستمتع بملابسك النظيفة!";
 
-            // In-app record for accounts only, push for everyone - as everywhere else here.
-            if (order.UserId is Guid ownerId)
-            {
-                await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
-            }
+            await _userNotificationService.CreateForOrderAsync(order, title, body);
 
             var pushToken = order.ResolvePushToken();
             if (!string.IsNullOrEmpty(pushToken))

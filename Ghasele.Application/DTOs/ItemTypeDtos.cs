@@ -21,6 +21,13 @@ namespace Ghasele.Application.DTOs
         public decimal? MaxPrice { get; set; }
 
         /// <summary>
+        /// The ironing-only price. On an update, leaving it out keeps the stored value - the
+        /// admin's item form predates this field and would otherwise wipe it on every save.
+        /// Send 0 to remove it (the item is then shown with its washing-and-ironing price only).
+        /// </summary>
+        public decimal? IronPrice { get; set; }
+
+        /// <summary>
         /// Position in the customer-facing catalogue, lowest first. Optional: omit it and a
         /// new item is appended to the end rather than jumping to the front, which is what a
         /// plain 0 would do. Callers written before this field existed keep working.
@@ -41,6 +48,9 @@ namespace Ghasele.Application.DTOs
 
         /// <summary>The ceiling, or null when the price is open-ended.</summary>
         public decimal? MaxPrice { get; set; }
+
+        /// <summary>The ironing-only price, or null when the item has none.</summary>
+        public decimal? IronPrice { get; set; }
 
         /// <summary>Position in the catalogue, lowest first. See ItemType.SortOrder.</summary>
         public int SortOrder { get; set; }

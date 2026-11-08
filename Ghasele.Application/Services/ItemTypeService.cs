@@ -39,6 +39,15 @@ namespace Ghasele.Application.Services
             }
         }
 
+        /// <summary>
+        /// Zero or below means "no ironing-only price", stored as null so clients have one
+        /// signal to check rather than two.
+        /// </summary>
+        private static decimal? NormalizeIronPrice(decimal? price)
+        {
+            return price is decimal p && p > 0 ? p : null;
+        }
+
         public async Task<ItemTypeDto> CreateItemTypeAsync(CreateItemTypeDto dto)
         {
             EnsurePriceRangeValid(dto);
@@ -49,6 +58,7 @@ namespace Ghasele.Application.Services
                 TypeNameEn = dto.TypeNameEn,
                 Price = dto.Price,
                 MaxPrice = dto.MaxPrice,
+                IronPrice = NormalizeIronPrice(dto.IronPrice),
                 SortOrder = dto.SortOrder ?? await NextSortOrderAsync(),
             };
 
@@ -88,6 +98,8 @@ namespace Ghasele.Application.Services
             item.TypeNameEn = dto.TypeNameEn;
             item.Price = dto.Price;
             item.MaxPrice = dto.MaxPrice;
+            // Omitted means unchanged - see CreateItemTypeDto.IronPrice.
+            if (dto.IronPrice.HasValue) item.IronPrice = NormalizeIronPrice(dto.IronPrice);
             // Left where it is when the caller says nothing, so an edit that only touches
             // prices cannot quietly move the item on the customer's pricing page.
             if (dto.SortOrder.HasValue) item.SortOrder = dto.SortOrder.Value;
@@ -107,6 +119,7 @@ namespace Ghasele.Application.Services
                 TypeName = BilingualText.Pick(item.TypeNameAr, item.TypeNameEn, _language.Language),
                 Price = item.Price,
                 MaxPrice = item.MaxPrice,
+                IronPrice = item.IronPrice,
                 SortOrder = item.SortOrder,
             };
         }

@@ -39,7 +39,11 @@ namespace Ghasele.Infrastructure.Data
                 entity.HasOne(e => e.User)
                       .WithMany()
                       .HasForeignKey(e => e.UserId)
+                      .IsRequired(false)
                       .OnDelete(DeleteBehavior.Cascade);
+
+                // A guest's bell looks its list up by this on every app open.
+                entity.HasIndex(e => e.DeviceToken);
             });
 
             modelBuilder.Entity<User>(entity =>
@@ -52,6 +56,7 @@ namespace Ghasele.Infrastructure.Data
                 entity.Property(e => e.FullName).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.FcmToken).HasMaxLength(500);
                 entity.Property(e => e.Role).HasConversion<string>();
+                entity.Property(e => e.PreferredLanguage).IsRequired().HasMaxLength(5).HasDefaultValue("ar");
             });
 
             modelBuilder.Entity<Order>(entity =>
@@ -150,6 +155,7 @@ namespace Ghasele.Infrastructure.Data
                 // Same precision as the base price it caps - a ceiling stored to a
                 // different scale than its floor would round differently on the way out.
                 entity.Property(e => e.MaxPrice).HasPrecision(18, 2);
+                entity.Property(e => e.IronPrice).HasPrecision(18, 2);
 
                 entity.HasData(
                     new ItemType

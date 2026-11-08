@@ -15,43 +15,39 @@ namespace Ghasele.Application.Services
 
         public NotificationService(IConfiguration configuration)
         {
-            try
+            // Program.cs creates the default Firebase app, resolving the credentials path
+            // against the content root. Checking that app - rather than re-testing the raw
+            // relative path here, which resolves against the process's working directory -
+            // keeps pushes from silently falling back to "simulated" on a host whose service
+            // starts in a different directory from the one the app is deployed to.
+            _isFirebaseInitialized = FirebaseApp.DefaultInstance != null;
+            if (!_isFirebaseInitialized)
             {
-                var path = configuration["Firebase:CredentialsPath"];
-                if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                {
-                    if (FirebaseApp.DefaultInstance == null)
-                    {
-                        FirebaseApp.Create(new AppOptions()
-                        {
-                            Credential = GoogleCredential.FromFile(path),
-                        });
-                    }
-                    _isFirebaseInitialized = true;
-                }
-                else
-                {
-                    Console.WriteLine("Firebase Credentials not found. Notifications will be simulated.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error initializing Firebase: {ex.Message}");
+                Console.WriteLine("Firebase Credentials not found. Notifications will be simulated.");
             }
         }
 
-        public async Task SendNotificationAsync(string fcmToken, string title, string body)
+        public async Task SendNotificationAsync(string fcmToken, string title, string body, System.Collections.Generic.Dictionary<string, string>? data = null)
         {
             if (string.IsNullOrEmpty(fcmToken)) return;
 
             if (!_isFirebaseInitialized)
             {
-                Console.WriteLine($"[SIMULATED NOTIFICATION] To: {fcmToken} | Title: {title} | Body: {body}");
+                Console.WriteLine($"[SIMULATED NOTIFICATION] To: {fcmToken} | Title: {title} | Body: {body} | Data: {(data == null ? "{}" : string.Join(", ", data))}");
                 return;
             }
 
             try
             {
+                var payload = new System.Collections.Generic.Dictionary<string, string>()
+                {
+                    { "click_action", "FLUTTER_NOTIFICATION_CLICK" },
+                };
+                if (data != null)
+                {
+                    foreach (var kvp in data) payload[kvp.Key] = kvp.Value;
+                }
+
                 var message = new Message()
                 {
                     Token = fcmToken,
@@ -60,10 +56,7 @@ namespace Ghasele.Application.Services
                         Title = title,
                         Body = body,
                     },
-                    Data = new System.Collections.Generic.Dictionary<string, string>()
-                    {
-                        { "click_action", "FLUTTER_NOTIFICATION_CLICK" },
-                    }
+                    Data = payload
                 };
 
                 string response = await FirebaseMessaging.DefaultInstance.SendAsync(message);

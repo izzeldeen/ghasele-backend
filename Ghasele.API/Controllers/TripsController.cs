@@ -112,11 +112,36 @@ namespace Ghasele.API.Controllers
             }
         }
 
+        /// <summary>
+        /// A captain starting their own collecting round self-assigns: the driver on the
+        /// created trip is always the caller's own driver row, taken from the token, never
+        /// from the body - otherwise a driver could create a round and hand it to someone
+        /// else. The admin dashboard is unaffected: it is never in the "Driver" role, so it
+        /// keeps choosing the driver explicitly as it always has.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> CreateTrip([FromBody] CreateTripDto dto)
         {
             try
             {
+                if (User.IsInRole("Driver"))
+                {
+                    var driverId = await ResolveCallerDriverIdAsync();
+                    if (driverId == null)
+                    {
+                        return BadRequest(new { errorCode = ErrorCodes.DriverNotFound, message = L(ErrorCodes.DriverNotFound) });
+                    }
+                    dto.DriverId = driverId;
+                }
+                else if (dto.DriverId == null)
+                {
+                    // The driver app never sends a driver. An account that has a driver row
+                    // but is not in the Driver role (an admin who also drives) would
+                    // otherwise reach the service with no driver at all. Only fills a gap:
+                    // a driver the dashboard chose explicitly is left alone.
+                    dto.DriverId = await ResolveCallerDriverIdAsync();
+                }
+
                 var trip = await _tripService.CreateTripAsync(dto);
                 return Ok(trip);
             }

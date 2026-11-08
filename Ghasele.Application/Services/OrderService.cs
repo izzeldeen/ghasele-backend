@@ -406,12 +406,7 @@ namespace Ghasele.Application.Services
             string title = "أغراضك بأيدٍ أمينة ✨";
             string body = $"استلمنا أغراضك وأصبحت بأيدٍ أمينة. المجموع {amount} دينار. سنعتني بها جيدًا ونعيدها إليك نظيفة وجاهزة عند اكتمالها.";
 
-            // The in-app list is keyed by user, so only a signed-in order gets a stored record.
-            // A guest has no account to read one from - the push is their whole notification.
-            if (order.UserId is Guid ownerId)
-            {
-                await _userNotificationService.CreateNotificationAsync(ownerId, title, body);
-            }
+            await _userNotificationService.CreateForOrderAsync(order, title, body);
 
             // Guest orders push to the token captured at checkout; see Order.ResolvePushToken.
             var pushToken = order.ResolvePushToken();
@@ -429,14 +424,72 @@ namespace Ghasele.Application.Services
             if (dto.Lat.HasValue) order.Lat = dto.Lat.Value;
             if (dto.Long.HasValue) order.Long = dto.Long.Value;
             if (dto.CleanerAmount.HasValue) order.CleanerAmount = dto.CleanerAmount.Value;
+
+            // Read before overwriting: the "cleaning finished" push goes out on the transition
+            // into Ready only, so re-sending the same status (or a retried/duplicate request)
+            // never notifies twice.
+            var previousStatus = order.Status;
             if (!string.IsNullOrEmpty(dto.Status) && Enum.TryParse<OrderStatus>(dto.Status, true, out var status))
             {
                 order.Status = status;
+
+                if (status == OrderStatus.Ready && previousStatus != OrderStatus.Ready)
+                {
+                    // The collection slot this order rode on is done with - the same
+                    // DeliveryWindowId/ScheduledDate fields are reused for the return-delivery
+                    // slot, so they are cleared here and left for the customer to pick fresh
+                    // (see EnsureScheduleChangeable / RescheduleOrderAsync).
+                    order.DeliveryWindowId = null;
+                    order.ScheduledDate = null;
+                    order.ScheduledStartTime = null;
+                    order.ScheduledEndTime = null;
+                }
             }
 
             await _orderRepository.UpdateAsync(order);
+
+            if (order.Status == OrderStatus.Ready && previousStatus != OrderStatus.Ready)
+            {
+                await NotifyCleaningFinishedAsync(order);
+            }
+
             var itemTypes = await _itemTypeRepository.GetAllAsync();
             return MapToDto(order, _language.Language, itemTypes);
+        }
+
+        /// <summary>
+        /// Tells the customer their items are clean and asks them to arrange delivery - either
+        /// by waiting for the team to call, or by picking a time themselves from the app.
+        /// </summary>
+        /// <remarks>
+        /// Localized per the customer's own language, read from <see cref="User.PreferredLanguage"/>
+        /// rather than <see cref="ICurrentLanguageProvider"/>: this fires on an admin's request
+        /// (see UpdateOrderAsync), whose Accept-Language is the admin's, not the customer's. A
+        /// guest has no user row to hold a preference, so it falls back to Arabic like every
+        /// other push in the app.
+        /// </remarks>
+        private async Task NotifyCleaningFinishedAsync(Order order)
+        {
+            var language = order.User?.PreferredLanguage ?? "ar";
+
+            string title = BilingualText.Pick("✨ طلبك جاهز!", "✨ Your order is ready!", language);
+            string body = BilingualText.Pick(
+                "تم تنظيف ملابسك والاعتناء فيها، وطلبك الآن جاهز للتوصيل 🧺✨\n\nفريقنا رح يتواصل معك لتنسيق وقت التوصيل، أو تقدر تختار الوقت المناسب إلك مباشرة من التطبيق.",
+                "Your clothes have been cleaned and carefully taken care of, and your order is now ready for delivery 🧺✨\n\nOur team will contact you to arrange a delivery time, or you can choose a time that works best for you directly from the app.",
+                language);
+
+            await _userNotificationService.CreateForOrderAsync(order, title, body, order.Id);
+
+            var pushToken = order.ResolvePushToken();
+            if (!string.IsNullOrEmpty(pushToken))
+            {
+                var data = new Dictionary<string, string>
+                {
+                    { "type", "cleaning_finished" },
+                    { "orderId", order.Id.ToString() }
+                };
+                await _notificationService.SendNotificationAsync(pushToken, title, body, data);
+            }
         }
 
         /// <summary>
@@ -453,7 +506,7 @@ namespace Ghasele.Application.Services
             if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
 
             EnsureOwnedByCaller(order, callerId, deviceToken);
-            EnsureCustomerChangeable(order);
+            EnsureCancellable(order);
 
             order.Status = OrderStatus.Cancelled;
             await _orderRepository.UpdateAsync(order);
@@ -463,12 +516,15 @@ namespace Ghasele.Application.Services
         }
 
         /// <summary>
-        /// Moves the customer's own order to a different collection slot.
+        /// Moves the customer's own order to a different slot - the collection window before
+        /// pickup, or the return-delivery window once cleaning is done (<see cref="OrderStatus.Ready"/>).
         /// </summary>
         /// <remarks>
-        /// The new slot goes through the same validation as a slot chosen at checkout, so a
-        /// window that has since been switched off, filled or started is refused here exactly
-        /// as it would be there - and with the same message, which the app already handles.
+        /// Both legs share the same DeliveryWindowId/ScheduledDate/ScheduledStartTime/
+        /// ScheduledEndTime fields and the same validation: a window that has since been
+        /// switched off, filled or started is refused here exactly as it would be at checkout,
+        /// and with the same message, which the app already handles. Which leg is active is
+        /// decided by <see cref="EnsureScheduleChangeable"/> from the order's current status.
         /// </remarks>
         public async Task<OrderDto> RescheduleOrderAsync(Guid id, RescheduleOrderDto dto, Guid? callerId, string? deviceToken)
         {
@@ -476,7 +532,7 @@ namespace Ghasele.Application.Services
             if (order == null) throw AppException.NotFound(ErrorCodes.OrderNotFound);
 
             EnsureOwnedByCaller(order, callerId, deviceToken);
-            EnsureCustomerChangeable(order);
+            EnsureScheduleChangeable(order);
 
             var itemTypes = await _itemTypeRepository.GetAllAsync();
 
@@ -531,7 +587,7 @@ namespace Ghasele.Application.Services
         }
 
         /// <summary>
-        /// Refuses the request unless the order is still one the customer may change.
+        /// Refuses the request unless the order is still one the customer may cancel.
         /// </summary>
         /// <remarks>
         /// PendingCollection is the whole window: joining a trip moves an order to Assigned
@@ -540,12 +596,40 @@ namespace Ghasele.Application.Services
         /// rides a trip that has set off - a driver on the road must not have the stop pulled
         /// out from under them.
         /// </remarks>
-        private static void EnsureCustomerChangeable(Order order)
+        private static void EnsureCancellable(Order order)
         {
             if (order.Status != OrderStatus.PendingCollection || order.Trip?.StartedAt != null)
             {
                 throw new AppException(ErrorCodes.OrderNotChangeable);
             }
+        }
+
+        /// <summary>
+        /// Refuses the request unless the order has an active slot to move - the collection
+        /// window before pickup, or the return-delivery window once cleaning has finished.
+        /// </summary>
+        /// <remarks>
+        /// The trip-started check only applies to the collection leg: once an order reaches
+        /// Ready its collection trip is long done, so <see cref="Order.Trip"/> having set off
+        /// says nothing about whether a delivery time may still be chosen.
+        /// </remarks>
+        private static void EnsureScheduleChangeable(Order order)
+        {
+            if (order.Status == OrderStatus.PendingCollection)
+            {
+                if (order.Trip?.StartedAt != null)
+                {
+                    throw new AppException(ErrorCodes.OrderNotChangeable);
+                }
+                return;
+            }
+
+            if (order.Status == OrderStatus.Ready)
+            {
+                return;
+            }
+
+            throw new AppException(ErrorCodes.OrderNotChangeable);
         }
 
         public async Task<OrderDto> DeleteOrderItemAsync(Guid orderId, Guid itemId)

@@ -552,6 +552,13 @@ namespace Ghasele.Application.Services
             if (user != null)
             {
                 user.FcmToken = token;
+
+                // Piggybacks on this call rather than a dedicated endpoint: the app already
+                // refreshes its push token (and sends Accept-Language) on every launch, which
+                // makes this the one place a signed-in user's language preference can be kept
+                // current for notifications triggered outside their own request.
+                user.PreferredLanguage = _language.Language;
+
                 await _userRepository.UpdateAsync(user);
             }
         }

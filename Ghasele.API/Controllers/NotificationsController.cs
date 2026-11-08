@@ -1,16 +1,21 @@
 using System;
-using System.Security.Claims;
 using System.Threading.Tasks;
 using Ghasele.Application.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ghasele.API.Controllers
 {
-    [Authorize]
+    /// <summary>
+    /// The customer's in-app notification list, for signed-in customers and guests alike.
+    /// </summary>
+    /// <remarks>
+    /// Open to anonymous callers on purpose: a guest's list is filed under the
+    /// <c>X-Device-Token</c> of the install that placed their orders, exactly as their orders
+    /// are. A signed-in caller always gets their account's list, never the device's.
+    /// </remarks>
     [ApiController]
     [Route("api/[controller]")]
-    public class NotificationsController : ControllerBase
+    public class NotificationsController : ApiControllerBase
     {
         private readonly IUserNotificationService _notificationService;
 
@@ -22,31 +27,29 @@ namespace Ghasele.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetNotifications()
         {
-            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var notifications = await _notificationService.GetUserNotificationsAsync(userId);
+            var notifications = await _notificationService.GetNotificationsAsync(CallerId(), DeviceToken());
             return Ok(notifications);
         }
 
         [HttpPatch("{id}/read")]
         public async Task<IActionResult> MarkAsRead(Guid id)
         {
-            await _notificationService.MarkAsReadAsync(id);
-            return Ok();
+            var found = await _notificationService.MarkAsReadAsync(id, CallerId(), DeviceToken());
+            return found ? Ok() : NotFound();
         }
 
         [HttpPatch("read-all")]
         public async Task<IActionResult> MarkAllAsRead()
         {
-            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            await _notificationService.MarkAllAsReadAsync(userId);
+            await _notificationService.MarkAllAsReadAsync(CallerId(), DeviceToken());
             return Ok();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            await _notificationService.DeleteNotificationAsync(id);
-            return Ok();
+            var found = await _notificationService.DeleteNotificationAsync(id, CallerId(), DeviceToken());
+            return found ? Ok() : NotFound();
         }
     }
 }

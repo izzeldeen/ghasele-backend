@@ -39,5 +39,13 @@ namespace Ghasele.Domain.Entities
         public DateTime? ResetPasswordOtpExpiry { get; set; }
 
         public bool IsPhoneVerified { get; set; } = false;
+
+        /// <summary>
+        /// "ar" or "en" - the language this customer's app was set to the last time it
+        /// called the server, used to localize notifications sent outside of their own
+        /// request (e.g. a status change an admin triggers), where there is no
+        /// Accept-Language header of theirs to read.
+        /// </summary>
+        public string PreferredLanguage { get; set; } = "ar";
     }
 }

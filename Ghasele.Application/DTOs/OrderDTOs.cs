@@ -114,10 +114,15 @@ namespace Ghasele.Application.DTOs
         public string Status { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
 
-        /// <summary>The booked trip schedule window, or null for a pre-scheduling order.</summary>
+        /// <summary>
+        /// The booked trip schedule window - the collection slot before Status reaches Ready,
+        /// the return-delivery slot from Ready onwards (cleared when the order enters Ready,
+        /// so null here then means "not yet picked", not "still the old collection slot").
+        /// Null for a pre-scheduling order.
+        /// </summary>
         public Guid? DeliveryWindowId { get; set; }
 
-        /// <summary>Local collection date, "yyyy-MM-dd".</summary>
+        /// <summary>Local date for the slot above, "yyyy-MM-dd".</summary>
         public DateOnly? ScheduledDate { get; set; }
 
         /// <summary>Local window bounds as "HH:mm", as agreed with the customer.</summary>

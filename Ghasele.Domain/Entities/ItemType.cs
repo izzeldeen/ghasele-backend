@@ -44,6 +44,17 @@ namespace Ghasele.Domain.Entities
         public decimal? MaxPrice { get; set; }
 
         /// <summary>
+        /// What ironing alone costs, in JOD, or null when the item is not offered as
+        /// ironing-only.
+        /// </summary>
+        /// <remarks>
+        /// Information for the customer's pricing page, shown beside <see cref="Price"/> so
+        /// both rates are known before booking. It does not price an order: the captain
+        /// settles each line's figure at the door, as for every item.
+        /// </remarks>
+        public decimal? IronPrice { get; set; }
+
+        /// <summary>
         /// Where this sits in the catalogue the customer reads, lowest first.
         /// </summary>
         /// <remarks>

@@ -23,19 +23,45 @@ namespace Ghasele.Infrastructure.Repositories
             return await _context.Notifications.FindAsync(id);
         }
 
-        public async Task<List<Notification>> GetByUserIdAsync(Guid userId)
+        public async Task<List<Notification>> GetByOwnerAsync(Guid? userId, string? deviceToken)
         {
-            return await _context.Notifications
-                .Where(n => n.UserId == userId)
+            return await OwnedBy(userId, deviceToken)
                 .OrderByDescending(n => n.CreatedAt)
                 .ToListAsync();
         }
 
-        public async Task<List<Notification>> GetUnreadByUserIdAsync(Guid userId)
+        public async Task<List<Notification>> GetUnreadByOwnerAsync(Guid? userId, string? deviceToken)
+        {
+            return await OwnedBy(userId, deviceToken)
+                .Where(n => !n.IsRead)
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// An account's notifications when there is a user, otherwise the guest install's.
+        /// Never both: a signed-in caller's device token is not a second key into the table,
+        /// or anyone who had once used the handset as a guest could read the list.
+        /// </summary>
+        private IQueryable<Notification> OwnedBy(Guid? userId, string? deviceToken)
+        {
+            if (userId is Guid id)
+            {
+                return _context.Notifications.Where(n => n.UserId == id);
+            }
+            if (!string.IsNullOrWhiteSpace(deviceToken))
+            {
+                return _context.Notifications.Where(n => n.UserId == null && n.DeviceToken == deviceToken);
+            }
+            return _context.Notifications.Where(n => false);
+        }
+
+        public async Task<int> ClaimGuestNotificationsAsync(string deviceToken, Guid userId)
         {
             return await _context.Notifications
-                .Where(n => n.UserId == userId && !n.IsRead)
-                .ToListAsync();
+                .Where(n => n.UserId == null && n.DeviceToken == deviceToken)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(n => n.UserId, userId)
+                    .SetProperty(n => n.DeviceToken, (string?)null));
         }
 
         public async Task AddAsync(Notification notification)

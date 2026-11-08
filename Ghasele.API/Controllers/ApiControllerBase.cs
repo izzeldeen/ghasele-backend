@@ -84,6 +84,10 @@ namespace Ghasele.API.Controllers
             {
                 var orders = HttpContext.RequestServices.GetRequiredService<IOrderService>();
                 await orders.ClaimGuestOrdersAsync(auth.Id, deviceToken);
+
+                // The notifications about those orders follow them, so the bell keeps its history.
+                var notifications = HttpContext.RequestServices.GetRequiredService<IUserNotificationService>();
+                await notifications.ClaimGuestNotificationsAsync(auth.Id, deviceToken);
             }
             catch (Exception ex)
             {
